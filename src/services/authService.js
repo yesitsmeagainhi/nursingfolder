@@ -1,16 +1,14 @@
-import auth from "@react-native-firebase/auth";
+// src/services/authService.js
+import auth from '@react-native-firebase/auth';
 
-// Convert mobile → fake email
-const formatEmail = (mobile) => `${mobile}@nursing.com`;
+export const signIn = (email, password) =>
+  auth().signInWithEmailAndPassword(email, password);
 
-export const registerUser = async (mobile, password) => {
-  return auth().createUserWithEmailAndPassword(formatEmail(mobile), password);
-};
+export const signUp = (email, password) =>
+  auth().createUserWithEmailAndPassword(email, password);
 
-export const loginUser = async (mobile, password) => {
-  return auth().signInWithEmailAndPassword(formatEmail(mobile), password);
-};
+export const signOut = () => auth().signOut();
 
-export const logoutUser = async () => {
-  return auth().signOut();
-};
+export const onAuthChanged = (cb) => auth().onAuthStateChanged(cb);
+
+export const currentUser = () => auth().currentUser;

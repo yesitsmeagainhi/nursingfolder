@@ -1,68 +1,45 @@
-import React, { useState } from "react";
-import { View, Text, TextInput, TouchableOpacity, Alert, StyleSheet } from "react-native";
-import { loginUser, registerUser } from "../services/authService";
+import React, { useState } from 'react';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
+import { signIn } from '../services/authService';
+import { THEME } from '../utils/map';
 
 export default function LoginScreen({ navigation }) {
-  const [mobile, setMobile] = useState("");
-  const [password, setPassword] = useState("");
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [busy, setBusy] = useState(false);
+  const goSignup = () => navigation.replace('Signup');
 
-  const handleLogin = async () => {
-  try {
-    await loginUser(mobile, password);
-    // ✅ Navigate to Home after login
-    navigation.replace("Home");  
-  } catch (err) {
-    Alert.alert("❌ Error", err.message);
-  }
-};
-
-
-
-  const handleSignup = async () => {
+  const onLogin = async () => {
+    if (!email || !password) return;
+    setBusy(true);
     try {
-      await registerUser(mobile, password);
-      Alert.alert("🎉 Account created", "You can log in now!");
-    } catch (err) {
-      Alert.alert("❌ Error", err.message);
+      await signIn(email.trim(), password);
+      navigation.replace('Home');
+    } catch (e) {
+      alert(e?.message || 'Login failed');
+    } finally {
+      setBusy(false);
     }
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>🩺 Nursing App</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Mobile Number"
-        keyboardType="phone-pad"
-        value={mobile}
-        onChangeText={setMobile}
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="Password"
-        secureTextEntry
-        value={password}
-        onChangeText={setPassword}
-      />
-
-      <TouchableOpacity style={styles.button} onPress={handleLogin}>
-        <Text style={styles.buttonText}>Login</Text>
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={s.wrap}>
+      <Text style={s.h1}>Welcome back 👋</Text>
+      <TextInput placeholder="Email" style={s.input} autoCapitalize="none" keyboardType="email-address" value={email} onChangeText={setEmail}/>
+      <TextInput placeholder="Password" style={s.input} secureTextEntry value={password} onChangeText={setPassword}/>
+      <TouchableOpacity style={[s.btn, busy && { opacity: 0.6 }]} onPress={onLogin} disabled={busy}>
+        <Text style={s.btnText}>{busy ? 'Signing in…' : 'Sign in'}</Text>
       </TouchableOpacity>
-
-      <TouchableOpacity onPress={() => navigation.navigate("Signup")}>
-  <Text style={styles.link}>New user? Create Account</Text>
-</TouchableOpacity>
-
-
-    </View>
+      <TouchableOpacity onPress={goSignup}><Text style={s.link}>Create account</Text></TouchableOpacity>
+    </KeyboardAvoidingView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: "center", padding: 20, backgroundColor: "#f9f9f9" },
-  title: { fontSize: 28, fontWeight: "bold", textAlign: "center", marginBottom: 30 },
-  input: { borderWidth: 1, borderColor: "#ccc", borderRadius: 8, padding: 12, marginBottom: 15, backgroundColor: "#fff" },
-  button: { backgroundColor: "#2980b9", padding: 15, borderRadius: 8, marginBottom: 15 },
-  buttonText: { color: "#fff", textAlign: "center", fontWeight: "600", fontSize: 16 },
-  link: { color: "#2980b9", textAlign: "center" },
+const s = StyleSheet.create({
+  wrap: { flex: 1, backgroundColor: '#f4f7fb', padding: 20, justifyContent: 'center' },
+  h1: { fontSize: 24, fontWeight: '800', marginBottom: 20, color: '#111827' },
+  input: { backgroundColor: '#fff', borderRadius: 12, padding: 14, marginVertical: 8, borderWidth: 1, borderColor: '#e5e7eb' },
+  btn: { backgroundColor: THEME, padding: 14, borderRadius: 12, marginTop: 10, alignItems: 'center' },
+  btnText: { color: '#fff', fontWeight: '700' },
+  link: { marginTop: 16, color: THEME, fontWeight: '600', textAlign: 'center' },
 });

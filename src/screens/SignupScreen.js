@@ -1,76 +1,46 @@
-import React, { useState } from "react";
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from "react-native";
-import { registerUser } from "../services/authService";
+import React, { useState } from 'react';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
+import { signUp } from '../services/authService';
+import { THEME } from '../utils/map';
 
 export default function SignupScreen({ navigation }) {
-  const [mobile, setMobile] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [busy, setBusy] = useState(false);
 
-  const handleSignup = async () => {
-    if (mobile.length < 10) {
-      Alert.alert("Error", "Enter a valid 10-digit mobile number");
-      return;
-    }
-    if (password !== confirmPassword) {
-      Alert.alert("Error", "Passwords do not match");
-      return;
-    }
+  const onSignup = async () => {
+    if (!email || !password) return;
+    setBusy(true);
     try {
-      await registerUser(mobile, password);
-      Alert.alert("✅ Success", "Account created! Please login.");
-      navigation.goBack(); // back to LoginScreen
-    } catch (err) {
-      Alert.alert("❌ Signup Failed", err.message);
+      await signUp(email.trim(), password);
+      navigation.replace('Home');
+    } catch (e) {
+      alert(e?.message || 'Signup failed');
+    } finally {
+      setBusy(false);
     }
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>🩺 Nursing App</Text>
-      <Text style={styles.subtitle}>Create New Account</Text>
-
-      <TextInput
-        style={styles.input}
-        placeholder="Mobile Number"
-        keyboardType="phone-pad"
-        value={mobile}
-        onChangeText={setMobile}
-      />
-
-      <TextInput
-        style={styles.input}
-        placeholder="Password"
-        secureTextEntry
-        value={password}
-        onChangeText={setPassword}
-      />
-
-      <TextInput
-        style={styles.input}
-        placeholder="Confirm Password"
-        secureTextEntry
-        value={confirmPassword}
-        onChangeText={setConfirmPassword}
-      />
-
-      <TouchableOpacity style={styles.button} onPress={handleSignup}>
-        <Text style={styles.buttonText}>Create Account</Text>
+    <View style={s.wrap}>
+      <Text style={s.h1}>Create account</Text>
+      <TextInput placeholder="Email" style={s.input} autoCapitalize="none" keyboardType="email-address" value={email} onChangeText={setEmail}/>
+      <TextInput placeholder="Password" style={s.input} secureTextEntry value={password} onChangeText={setPassword}/>
+      <TouchableOpacity style={[s.btn, busy && { opacity: 0.6 }]} onPress={onSignup} disabled={busy}>
+        <Text style={s.btnText}>{busy ? 'Creating…' : 'Sign up'}</Text>
       </TouchableOpacity>
-
-      <TouchableOpacity onPress={() => navigation.goBack()}>
-        <Text style={styles.link}>Already have an account? Login</Text>
+      <TouchableOpacity onPress={() => navigation.replace('Login')}>
+        <Text style={s.link}>I have an account</Text>
       </TouchableOpacity>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: "center", padding: 20, backgroundColor: "#f9f9f9" },
-  title: { fontSize: 28, fontWeight: "bold", textAlign: "center", marginBottom: 10, color: "#2c3e50" },
-  subtitle: { fontSize: 16, textAlign: "center", marginBottom: 30, color: "#7f8c8d" },
-  input: { borderWidth: 1, borderColor: "#ccc", borderRadius: 8, padding: 12, marginBottom: 15, backgroundColor: "#fff" },
-  button: { backgroundColor: "#27ae60", padding: 15, borderRadius: 8, marginBottom: 15 },
-  buttonText: { color: "#fff", textAlign: "center", fontWeight: "600", fontSize: 16 },
-  link: { color: "#2980b9", textAlign: "center" },
+const s = StyleSheet.create({
+  wrap: { flex: 1, backgroundColor: '#f4f7fb', padding: 20, justifyContent: 'center' },
+  h1: { fontSize: 24, fontWeight: '800', marginBottom: 20, color: '#111827' },
+  input: { backgroundColor: '#fff', borderRadius: 12, padding: 14, marginVertical: 8, borderWidth: 1, borderColor: '#e5e7eb' },
+  btn: { backgroundColor: THEME, padding: 14, borderRadius: 12, marginTop: 10, alignItems: 'center' },
+  btnText: { color: '#fff', fontWeight: '700' },
+  link: { marginTop: 16, color: THEME, fontWeight: '600', textAlign: 'center' },
 });
