@@ -129,7 +129,7 @@ export default function HomeScreen({ navigation }) {
             <TouchableOpacity><Icon name="menu" size={28} color="#fff" /></TouchableOpacity>
             <TouchableOpacity><Icon name="bell-outline" size={28} color="#fff" /></TouchableOpacity>
           </View>
-          <Text style={styles.headerTitle}>Find Your{"\n"}Favorite Course</Text>
+          <Text style={styles.headerTitle}>Search Any{"\n"}Topic</Text>
           <View style={styles.searchBar}>
             <Icon name="magnify" size={22} color="#9ca3af" />
             <TextInput
@@ -175,13 +175,13 @@ export default function HomeScreen({ navigation }) {
             {featuredCourse && (
               <TouchableOpacity onPress={() => onItemPress(featuredCourse)}>
                 <ImageBackground
-                  source={{ uri: featuredCourse.imageUrl || 'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?q=80&w=2070' }}
+                  source={{ uri: featuredCourse.imageUrl || 'https://blogger.googleusercontent.com/img/a/AVvXsEhoUgeOOOFDhUPdXnaIqgBHixqU9mhuWfO-PmMU7Ez4I356VndPIOnU3U6jxsbr6L9tdJ-06g7Jt6e7cphzVqx_uCPkcS9cvG1lqI76IlxHLyUJxEjqa-wYXeR3OHUB6x4hk10JMIhH400wbIgoTPhx3ipvJEyz868up_ux-KRW3D9CXPvMJacEMqB0' }}
                   style={styles.featuredCard}
                   imageStyle={{ borderRadius: 20 }}
                 >
                   <View style={styles.featuredTextContainer}>
                     <Text style={styles.featuredTitle}>{featuredCourse.name}</Text>
-                    <Text style={styles.featuredSubtitle}>Our Most Popular Course</Text>
+                    <Text style={styles.featuredSubtitle}></Text>
                   </View>
                   <View style={styles.playButton}>
                     <Icon name="play" size={24} color="#7b61ff" />
