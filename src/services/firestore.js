@@ -88,3 +88,40 @@ export const getVideosBySubunit = async ({
       .orderBy('order', 'asc')
       .get()
   );
+export const searchNodesByNamePrefix = async (query, limit = 50) => {
+  const lower = (query || '').trim().toLowerCase();
+  if (!lower) return [];
+
+  const snap = await firestore()
+    .collection('nodes')
+    .where('name_lowercase', '>=', lower)
+    .where('name_lowercase', '<=', lower + '\uf8ff')
+    .limit(limit)
+    .get();
+
+  return snap.docs.map(d => ({
+    id: d.id,
+    __collection: 'nodes',
+    ...d.data(),
+  }));
+};
+
+/**
+ * Optional: fetch top-level folders (parentId == null, type == 'folder')
+ * to show on the Home hero + "popular". No search here—just initial load.
+ */
+export const getTopLevelFolders = async (limit = 100) => {
+  const snap = await firestore()
+    .collection('nodes')
+    .where('parentId', '==', null)
+    .where('type', '==', 'folder')
+    .orderBy('order', 'asc') // needs a composite index with (parentId, type, order)
+    .limit(limit)
+    .get();
+
+  return snap.docs.map(d => ({
+    id: d.id,
+    __collection: 'nodes',
+    ...d.data(),
+  }));
+};

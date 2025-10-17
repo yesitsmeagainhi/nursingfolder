@@ -1,97 +1,144 @@
-import React, { useEffect, useState } from 'react';
+// src/screens/ExplorerScreen.js
+import React, { useEffect, useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, FlatList, TouchableOpacity,
-  ActivityIndicator
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
+  ActivityIndicator,
 } from 'react-native';
 import firestore from '@react-native-firebase/firestore';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import ListItem from '../components/ListItem';
 
 export default function ExplorerScreen({ route, navigation }) {
-  const [stack, setStack] = useState([{ id: null, name: 'Root' }]);
-  const current = stack[stack.length - 1];
+  // Current folder context (null => root)
+  const currentId = route?.params?.openFolderId ?? null;
+  const currentName = route?.params?.openFolderName ?? 'Root';
 
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState([]);
 
+  // Set the header title to current folder name
   useEffect(() => {
-    const id = route?.params?.openFolderId;
-    const name = route?.params?.openFolderName;
-    if (id && name) {
-      setStack([{ id: null, name: 'Root' }, { id, name }]);
-    }
-  }, [route?.params]);
+    navigation.setOptions({ title: currentName });
+  }, [currentName, navigation]);
 
+  // Subscribe to children of the current folder
   useEffect(() => {
     setLoading(true);
-    const q = firestore()
-      .collection('nodes')
-      .where('parentId', '==', current.id)
+
+    const col = firestore().collection('nodes');
+
+    // If we're at root, match parentId == null OR parentRef == null
+    const isRoot = currentId == null;
+
+    // Q1: string parentId
+    const q1 = col
+      .where('parentId', '==', isRoot ? null : currentId)
       .orderBy('order', 'asc');
 
-    const unsub = q.onSnapshot(
-      snap => {
-        let items = snap.docs.map(d => ({ id: d.id, ...(d.data()) }));
-        items = items.sort((a, b) => {
-          if ((a.order ?? 0) !== (b.order ?? 0)) return (a.order ?? 0) - (b.order ?? 0);
-          return String(a.name || '').localeCompare(String(b.name || ''));
-        });
-        setRows(items);
-        setLoading(false);
+    // Q2: DocumentReference parentRef
+    const parentRef = isRoot ? null : col.doc(currentId);
+    const q2 = col
+      .where('parentRef', '==', isRoot ? null : parentRef)
+      .orderBy('order', 'asc');
+
+    let a = [];
+    let b = [];
+    const unsubs = [];
+
+    const mapSnap = (snap) => snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+
+    const apply = () => {
+      // merge + de-dupe by id
+      const byId = new Map();
+      [...a, ...b].forEach((x) => byId.set(x.id, x));
+      let items = Array.from(byId.values());
+
+      // Stable sort: order asc, then name asc
+      items = items.sort((x, y) => {
+        const ox = x.order ?? 0;
+        const oy = y.order ?? 0;
+        if (ox !== oy) return ox - oy;
+        return String(x.name || '').localeCompare(String(y.name || ''));
+      });
+
+      setRows(items);
+      setLoading(false);
+    };
+
+    const u1 = q1.onSnapshot(
+      (s) => {
+        a = mapSnap(s);
+        apply();
       },
-      e => {
-        console.warn('Explorer load error:', e);
-        setRows([]);
+      (e) => {
+        console.warn('Explorer q1 error:', e);
         setLoading(false);
       }
     );
-    return () => unsub && unsub();
-  }, [current?.id]);
 
-  const enterFolder = (item) => {
-    setStack(prev => [...prev, { id: item.id, name: item.name }]);
-  };
+    const u2 = q2.onSnapshot(
+      (s) => {
+        b = mapSnap(s);
+        apply();
+      },
+      (e) => {
+        console.warn('Explorer q2 error:', e);
+        setLoading(false);
+      }
+    );
 
-  // --- THIS FUNCTION IS THE FIX ---
-const goBack = () => navigation.navigate('Home');   // or navigation.popToTop()
-  
-  const openItemInApp = (item) => {
-    navigation.navigate('Viewer', {
-      title: item.name,
-      type: item.type,
-      url: item.url,
-      embedUrl: item.embedUrl,
-    });
-  };
+    unsubs.push(u1, u2);
+    return () => unsubs.forEach((fn) => fn && fn());
+  }, [currentId]);
+
+  // Open folder or file
+  const openItem = useCallback(
+    (item) => {
+      if (item.type === 'folder') {
+        // Drill-down: push another Explorer for the subfolder
+        navigation.push('Explorer', {
+          openFolderId: item.id,
+          openFolderName: item.name,
+        });
+      } else {
+        // Leaf: hand off to Viewer (it can fetch by nodeId and decide how to render)
+        navigation.push('Viewer', {
+          nodeId: item.id, title: item.name, type: item.type,
+          url: item.url,
+          embedUrl: item.embedUrl,
+        });
+      }
+    },
+    [navigation]
+  );
 
   const renderItem = ({ item }) => {
     const isFolder = item.type === 'folder';
-    const iconName =
-      isFolder ? 'folder' :
-      item.type === 'video' ? 'play-circle-outline' :
-      item.type === 'pdf' ? 'file-pdf-box' : 'link-variant';
+    const iconName = isFolder
+      ? 'folder'
+      : item.type === 'video'
+        ? 'play-circle-outline'
+        : item.type === 'pdf'
+          ? 'file-pdf-box'
+          : 'link-variant';
 
     return (
-      <ListItem
-        icon={iconName}
-        title={item.name}
-        subtitle={`${item.type.toUpperCase()} • order ${item.order ?? 0}`}
-        onPress={() => (isFolder ? enterFolder(item) : openItemInApp(item))}
-        right={isFolder ? null : <Icon name="chevron-right" size={20} color="#9ca3af" />}
-      />
+      <TouchableOpacity style={styles.row} onPress={() => openItem(item)}>
+        <Icon name={iconName} size={22} color="#6b7280" />
+        <View style={{ flex: 1, marginLeft: 12 }}>
+          <Text style={styles.title}>{item.name}</Text>
+          <Text style={styles.sub}>{(item.type || '').toUpperCase()}</Text>
+        </View>
+        <Icon name="chevron-right" size={20} color="#9ca3af" />
+      </TouchableOpacity>
     );
   };
 
   return (
     <View style={styles.wrap}>
-      <View style={styles.header}>
-        {/* The back button is now always visible on this screen */}
-        <TouchableOpacity onPress={goBack} style={styles.backButton}>
-          <Icon name="arrow-left" size={24} color="#111827" />
-        </TouchableOpacity>
-        <Text style={styles.title}>{current.name}</Text>
-      </View>
-
       {loading ? (
         <View style={styles.center}>
           <ActivityIndicator />
@@ -107,7 +154,7 @@ const goBack = () => navigation.navigate('Home');   // or navigation.popToTop()
           data={rows}
           keyExtractor={(it) => it.id}
           renderItem={renderItem}
-          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24 }}
+          contentContainerStyle={{ padding: 16, paddingBottom: 24 }}
         />
       )}
     </View>
@@ -116,22 +163,17 @@ const goBack = () => navigation.navigate('Home');   // or navigation.popToTop()
 
 const styles = StyleSheet.create({
   wrap: { flex: 1, backgroundColor: '#fff' },
-  header: {
-    padding: 16,
+  row: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 10,
+    elevation: 2,
   },
-  backButton: {
-    marginRight: 16,
-    padding: 4,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#111827',
-  },
+  title: { fontSize: 16, fontWeight: '600', color: '#111827' },
+  sub: { fontSize: 12, color: '#6b7280', marginTop: 2 },
   center: {
     flex: 1,
     alignItems: 'center',

@@ -68,6 +68,9 @@ const createVideoHtml = (embedUrl) => `
   </html>
 `;
 
+const goBackToPreviousScreen = () => {
+  NavigationActivation.goBack();
+}
 export default function ViewerScreen({ route }) {
   const { title, url, type, embedUrl } = route.params || {};
   const src = useMemo(() => toEmbedUrl({ url, type, embedUrl }), [url, type, embedUrl]);
@@ -96,7 +99,7 @@ export default function ViewerScreen({ route }) {
           javaScriptEnabled={true}
           domStorageEnabled={true}
           // This prop is key: it allows the YouTube player's fullscreen button to work
-          allowsFullscreenVideo={true} 
+          allowsFullscreenVideo={true}
           onError={(event) => alert(`WebView Error: ${event.nativeEvent.description}`)}
         />
       </View>
@@ -105,7 +108,7 @@ export default function ViewerScreen({ route }) {
       <View style={styles.contentContainer}>
         <Text style={styles.title}>{title}</Text>
         <Text style={styles.description}>
-          
+
         </Text>
       </View>
     </ScrollView>
