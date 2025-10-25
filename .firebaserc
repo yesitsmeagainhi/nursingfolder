@@ -1,0 +1,8 @@
+{
+  "projects": {
+    "default": "nursing-387c8",
+    "staging": "abs-leads"
+  },
+  "targets": {},
+  "etags": {}
+}
