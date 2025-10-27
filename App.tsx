@@ -455,7 +455,7 @@ import ViewerScreen from './src/screens/ViewerScreen';
 import VideoPlayerScreen from './src/screens/VideoPlayerScreen';
 import CourseDetailsScreen from './src/screens/CourseDetailsScreen';
 import NotificationsScreen from './src/screens/NotificationsScreen';
-
+import AIScreen from './src/screens/AIScreen';
 // Utilities
 import { addNotification } from './src/utils/notificationsStorage';
 import { startLocalVideoWatcher } from './src/utils/localVideoWatcher';
@@ -613,6 +613,7 @@ export default function App() {
         <Stack.Screen name="Home" component={HomeScreen} options={{ headerShown: false }} />
         <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ title: 'Notifications' }} />
         <Stack.Screen name="Contact" component={ContactScreen} options={{ title: 'Contact Us' }} />
+        <Stack.Screen name="AI" component={AIScreen} options={{ title: 'AI Assistant' }} />
         <Stack.Screen
           name="Explorer"
           component={ExplorerScreen}

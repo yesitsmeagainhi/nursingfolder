@@ -273,11 +273,11 @@ export default function HomeScreen({ navigation }) {
                 <TouchableOpacity onPress={() => setShowNodeBrowser(true)}>
                   <Icon name="menu" size={28} color="#fff" />
                 </TouchableOpacity>
-                <TouchableOpacity
+                {/* <TouchableOpacity
                   onPress={showTestNotification}
                   style={{ backgroundColor: '#7b61ff', padding: 10, borderRadius: 8, margin: 20 }}>
                   <Text style={{ color: '#fff', textAlign: 'center' }}>Send Test Notification</Text>
-                </TouchableOpacity>
+                </TouchableOpacity> */}
 
                 <TouchableOpacity onPress={() => navigation.navigate('Notifications')}>
                   <Icon name="bell-outline" size={28} color="#fff" />
@@ -369,6 +369,18 @@ export default function HomeScreen({ navigation }) {
       <NodeBrowserDrawer
         visible={showNodeBrowser}
         onClose={() => setShowNodeBrowser(false)}
+        userName="User"
+        onNavigate={(route) => navigation.navigate(route)}   // 👈 must be here
+        onOpenFolder={(folder) => {
+          // close drawer first, then navigate
+          setShowNodeBrowser(false);
+          requestAnimationFrame(() => {
+            navigation.navigate('Explorer', {
+              openFolderId: folder.id,
+              openFolderName: folder.name,
+            });
+          });
+        }}
         onOpenFile={(node) => {
           if (node.type === 'folder') return;
           if (node.type === 'video') {
@@ -385,13 +397,15 @@ export default function HomeScreen({ navigation }) {
       />
 
       {/* Bottom Nav */}
+      <View style={{ height: 24 }} />
       <View style={styles.bottomNav}>
         <TouchableOpacity style={styles.navItemActive}>
           <Icon name="home" size={22} color="#166534" />
           <Text style={styles.navTextActive}>Home</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.aiButton} activeOpacity={0.8}>
+        <TouchableOpacity style={styles.aiButton} activeOpacity={0.8}
+          onPress={() => navigation.navigate('AI')}>
           <View /* style={styles.aiIconContainer} */>
             <Icon name="robot" size={32} color="#7b61ff" />
           </View>
