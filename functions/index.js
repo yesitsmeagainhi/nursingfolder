@@ -1,214 +1,111 @@
-// // functions/index.js
-// const functions = require('firebase-functions');
-// const admin = require('firebase-admin');
-// admin.initializeApp();
+/**
+ * Import function triggers from their respective submodules:
+ *
+ * const {onCall} = require("firebase-functions/v2/https");
+ * const {onDocumentWritten} = require("firebase-functions/v2/firestore");
+ *
+ * See a full list of supported triggers at https://firebase.google.com/docs/functions
+ */
 
-// const buildNotification = (data) => ({
-//     notification: {
-//         title: '🎥 New Video Published',
-//         body: `${data.title || 'A new lesson'}${data.subject ? ' · ' + data.subject : ''}`
-//     },
-//     data: {
-//         type: 'video',
-//         title: data.title || '',
-//         path: data.path || '',
-//         subject: data.subject || '',
-//         courseId: data.courseId || '',
-//         url: data.url || ''
-//     }
+const { setGlobalOptions } = require("firebase-functions");
+const { onRequest } = require("firebase-functions/https");
+const logger = require("firebase-functions/logger");
+
+// For cost control, you can set the maximum number of containers that can be
+// running at the same time. This helps mitigate the impact of unexpected
+// traffic spikes by instead downgrading performance. This limit is a
+// per-function limit. You can override the limit for each function using the
+// `maxInstances` option in the function's options, e.g.
+// `onRequest({ maxInstances: 5 }, (req, res) => { ... })`.
+// NOTE: setGlobalOptions does not apply to functions using the v1 API. V1
+// functions should each use functions.runWith({ maxInstances: 10 }) instead.
+// In the v1 API, each function can only serve one request per container, so
+// this will be the maximum concurrent request count.
+setGlobalOptions({ maxInstances: 10 });
+
+// Create and deploy your first functions
+// https://firebase.google.com/docs/functions/get-started
+
+// exports.helloWorld = onRequest((request, response) => {
+//   logger.info("Hello logs!", {structuredData: true});
+//   response.send("Hello from Firebase!");
 // });
-
-// // Broadcast topic (everyone) or scoped topic(s)
-// const topicForAll = 'allUsers';
-// const topicForCourse = (courseId) => `course_${(courseId || 'general').toLowerCase()}`;
-
-// exports.notifyOnNewNodeCreate = functions.firestore
-//     .document('nodes/{nodeId}')
-//     .onCreate(async (snap) => {
-//         const data = snap.data() || {};
-//         if (data.type !== 'video') return null;             // only videos
-//         if (data.isPublished === false) return null;        // ignore drafts
-
-//         // Send to global + course-specific topic (if available)
-//         const message = buildNotification(data);
-//         const promises = [
-//             admin.messaging().send({ ...message, topic: topicForAll })
-//         ];
-//         if (data.courseId) {
-//             promises.push(admin.messaging().send({ ...message, topic: topicForCourse(data.courseId) }));
-//         }
-//         await Promise.all(promises);
-//         return null;
-//     });
-// exports.notifyOnNodePublish = functions.firestore
-//     .document('nodes/{nodeId}')
-//     .onUpdate(async (change) => {
-//         const before = change.before.data() || {};
-//         const after = change.after.data() || {};
-//         if (after.type !== 'video') return null;
-
-//         const wasDraft = before.isPublished === false || before.isPublished === undefined;
-//         const nowLive = after.isPublished === true;
-//         if (!(wasDraft && nowLive)) return null; // only when it becomes published
-
-//         const message = {
-//             notification: {
-//                 title: '🎬 Video Now Live',
-//                 body: `${after.title || 'New lesson'} is now available`
-//             },
-//             data: {
-//                 type: 'video',
-//                 title: after.title || '',
-//                 path: after.path || '',
-//                 subject: after.subject || '',
-//                 courseId: after.courseId || '',
-//                 url: after.url || ''
-//             }
-//         };
-
-//         const sends = [admin.messaging().send({ ...message, topic: 'allUsers' })];
-//         if (after.courseId) {
-//             sends.push(admin.messaging().send({ ...message, topic: `course_${after.courseId.toLowerCase()}` }));
-//         }
-//         await Promise.all(sends);
-//         return null;
-//     });
-const functions = require('firebase-functions');
+// Cloud Functions v1 (free tier friendly)
+const functions = require('firebase-functions');        // v1 API
 const admin = require('firebase-admin');
+const { google } = require('googleapis');
 
-try { admin.initializeApp(); } catch (e) { }
+admin.initializeApp(); // needed for Firestore writes
 
-/**
- * IMPORTANT: set this to your Firestore default location.
- * Examples: 'us-central1', 'asia-south1', 'europe-west1'
- */
-const REGION = 'us-central1'; // <-- CHANGE THIS IF YOUR PROJECT USES ANOTHER REGION
+function makeOAuth2(cfg) {
+    const oAuth2 = new google.auth.OAuth2(
+        cfg.client_id,
+        cfg.client_secret
+    );
+    oAuth2.setCredentials({ refresh_token: cfg.refresh_token });
+    return oAuth2;
+}
+const b64url = (s) =>
+    Buffer.from(s, 'utf8').toString('base64')
+        .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 
-// Convenience
-const db = admin.firestore();
+// Trigger on create/update of contactMessages/{id}
+exports.sendContactMail = functions
+    .region('asia-south1') // change if you prefer
+    .firestore
+    .document('contactMessages/{id}')
+    .onWrite(async (change, context) => {
+        const after = change.after.exists ? change.after.data() : null;
+        if (!after) return null;
 
-/**
- * Fire on document creation in 'nodes'
- */
-exports.onVideoNodeCreate = functions.region(REGION).firestore
-    .document('nodes/{docId}')
-    .onCreate(async (snap, ctx) => {
-        const data = snap.data() || {};
-        const docId = snap.id;
-
-        // Skip if already notified (defensive)
-        if (data.notifiedAt) {
-            console.log('[SKIP] already notified (create)', docId);
+        const cfg = functions.config().gmail || {};
+        if (!cfg.client_id || !cfg.client_secret || !cfg.refresh_token || !cfg.from) {
+            console.error('Gmail config missing. Run functions:config:set');
             return null;
         }
 
-        if (!isVideoNode(data)) {
-            console.log('[SKIP] not a video (create)', docId, { type: data.type });
-            return null;
-        }
+        const mail = after.mail || {};
+        if (mail.status !== 'pending') return null;
+
+        const name = (after.name || mail.name || 'Visitor').toString().trim();
+        const from = (after.email || mail.email || '').toString().trim();
+        const message = (after.message || mail.message || '').toString().trim();
+
+        const subject = `New contact message from ${name}`;
+        const html =
+            `<p><b>Name:</b> ${name}</p>` +
+            (from ? `<p><b>Email:</b> ${from}</p>` : '') +
+            `<p><b>Message:</b><br>${(message || '(no message)').replace(/\n/g, '<br>')}</p>` +
+            `<hr><p style="color:#888">Doc ID: ${context.params.id}</p>`;
+
+        const raw = [
+            `From: ABS App <${cfg.from}>`,
+            `To: ${cfg.from}`,
+            `Subject: ${subject}`,
+            'MIME-Version: 1.0',
+            'Content-Type: text/html; charset="UTF-8"',
+            '',
+            html
+        ].join('\r\n');
 
         try {
-            await sendVideoNotification(docId, data);
-            await markNotified(docId);
-            console.log('[OK] notified (create)', docId);
-        } catch (err) {
-            console.error('[ERR] notify(create)', docId, err);
-        }
-        return null;
-    });
-
-/**
- * Fire on document updates:
- * - when doc becomes a video
- * - when a playable URL is added later
- */
-exports.onVideoNodeUpdate = functions.region(REGION).firestore
-    .document('nodes/{docId}')
-    .onUpdate(async (change, ctx) => {
-        const before = change.before.data() || {};
-        const after = change.after.data() || {};
-        const docId = change.after.id;
-
-        // If we already notified, skip
-        if (after.notifiedAt) {
-            console.log('[SKIP] already notified (update)', docId);
-            return null;
-        }
-
-        const beforeIsVideo = isVideoNode(before);
-        const afterIsVideo = isVideoNode(after);
-        const urlAdded = !hasPlayableUrl(before) && hasPlayableUrl(after);
-
-        if (!beforeIsVideo && afterIsVideo) {
-            try {
-                await sendVideoNotification(docId, after);
-                await markNotified(docId);
-                console.log('[OK] notified (became video)', docId);
-            } catch (err) {
-                console.error('[ERR] notify(became video)', docId, err);
-            }
-        } else if (afterIsVideo && urlAdded) {
-            try {
-                await sendVideoNotification(docId, after);
-                await markNotified(docId);
-                console.log('[OK] notified (url added)', docId);
-            } catch (err) {
-                console.error('[ERR] notify(url added)', docId, err);
-            }
-        } else {
-            console.log('[SKIP] no notify condition (update)', docId, {
-                beforeIsVideo, afterIsVideo, urlAdded
+            const auth = makeOAuth2(cfg);
+            const gmail = google.gmail({ version: 'v1', auth });
+            await gmail.users.messages.send({
+                userId: 'me',
+                requestBody: { raw: b64url(raw) },
             });
+
+            await change.after.ref.set({
+                mail: { ...mail, status: 'sent', deliveredAt: new Date().toISOString() }
+            }, { merge: true });
+
+        } catch (err) {
+            console.error('Gmail send failed:', err?.message || err);
+            await change.after.ref.set({
+                mail: { ...mail, status: 'failed', error: String(err?.message || err), failedAt: new Date().toISOString() }
+            }, { merge: true });
         }
+
         return null;
     });
-
-/** ---------- helpers ---------- */
-
-function isVideoNode(d = {}) {
-    const t = String(d.type || '').trim().toLowerCase();
-    return ['video', 'videos', 'youtube', 'mp4'].includes(t);
-}
-
-function hasPlayableUrl(d = {}) {
-    return Boolean(d.url || d.embedUrl || d?.meta?.videoUrl || d?.meta?.embedUrl);
-}
-
-/**
- * Mark the node so we don't notify twice.
- */
-async function markNotified(docId) {
-    await db.collection('nodes').doc(docId).set(
-        { notifiedAt: admin.firestore.FieldValue.serverTimestamp() },
-        { merge: true }
-    );
-}
-
-/**
- * Send FCM to topic 'all' (must match app subscription).
- * NOTE: No android.notification.channelId here to avoid drops on Android 8+ if the channel isn't created in-app.
- */
-async function sendVideoNotification(docId, data) {
-    const title = data.name || 'New video added';
-    const body = data.subtitle || data.subject || 'Tap to watch';
-
-    const url = data.url || data?.meta?.videoUrl || '';
-    const embedUrl = data.embedUrl || data?.meta?.embedUrl || '';
-
-    const message = {
-        topic: 'all', // <-- MUST MATCH what your app subscribes to
-        notification: { title, body },
-        data: {
-            type: 'video',
-            nodeId: docId,
-            title,
-            url,
-            embedUrl,
-        },
-        android: { priority: 'high' },
-        apns: { payload: { aps: { sound: 'default' } } },
-    };
-
-    console.log('[FCM] sending', { docId, title, hasUrl: !!url, hasEmbed: !!embedUrl });
-    return admin.messaging().send(message);
-}

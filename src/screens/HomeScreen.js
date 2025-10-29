@@ -435,6 +435,7 @@ export default function HomeScreen({ navigation }) {
         </TouchableOpacity>
       </View>
     </SafeAreaView>
+
   );
 }
 

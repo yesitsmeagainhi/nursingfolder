@@ -8,9 +8,11 @@ import messaging from '@react-native-firebase/messaging';
 import { addNotification } from './src/utils/notificationsStorage';
 import App from './App';
 import { name as appName } from './app.json';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 messaging().setBackgroundMessageHandler(async (rm) => {
     try {
+
         const item = {
             id: rm?.messageId || String(Date.now()),
             title: rm?.notification?.title || rm?.data?.title || 'Update',
@@ -18,8 +20,10 @@ messaging().setBackgroundMessageHandler(async (rm) => {
             receivedAt: Date.now(),
             data: rm?.data || {},
         };
+
         await addNotification(item);
         // no UI here; app is backgrounded/terminated
+
     } catch (e) {
         // swallow
     }

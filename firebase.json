@@ -15,7 +15,6 @@
       "source": "functions"
     },
     {
-      "source": "nursing",
       "codebase": "nursing",
       "ignore": [
         "node_modules",
@@ -23,7 +22,8 @@
         "firebase-debug.log",
         "firebase-debug.*.log",
         "*.local"
-      ]
+      ],
+      "source": "nursing"
     }
   ]
 }
