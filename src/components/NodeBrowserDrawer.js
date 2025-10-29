@@ -344,7 +344,7 @@ function TreeFolder({ node, level, onOpenFile, onOpenFolder }) {
                     activeOpacity={0.7}
                     onPress={() => onOpenFolder?.(node)}
                 >
-                    <Icon name="folder" size={20} color="#7b61ff" style={{ marginRight: 6 }} />
+                    <Icon name="folder" size={20} color="##195ed2" style={{ marginRight: 6 }} />
                     <Text style={styles.rowText} numberOfLines={1}>{node.name}</Text>
                 </TouchableOpacity>
             </View>
@@ -484,7 +484,7 @@ export function NodeBrowserDrawer({ visible, onClose, onOpenFile, onOpenFolder, 
 
                     <TouchableOpacity style={styles.quickRow} onPress={() => go('AI')}>
                         <View style={styles.rowLeft}>
-                            <Icon name="robot" size={20} color="#7b61ff" />
+                            <Icon name="robot" size={20} color="##195ed2" />
                             <Text style={styles.rowText}>AI coming soon</Text>
                         </View>
                         <Icon name="chevron-right" size={20} color="#9aa3b2" />
@@ -500,7 +500,7 @@ export function NodeBrowserDrawer({ visible, onClose, onOpenFile, onOpenFolder, 
                 </View>
 
                 {loadingRoot ? (
-                    <View style={styles.loader}><ActivityIndicator size="small" color="#7b61ff" /></View>
+                    <View style={styles.loader}><ActivityIndicator size="small" color="##195ed2" /></View>
                 ) : (
                     <ScrollView contentContainerStyle={{ paddingBottom: 24 }}>
                         {/* Root folders */}

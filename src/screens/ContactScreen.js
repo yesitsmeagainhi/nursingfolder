@@ -211,7 +211,7 @@
 //                     </TouchableOpacity>
 
 //                     <TouchableOpacity style={styles.aiButton} onPress={() => navigation.navigate('AI')} activeOpacity={0.8}>
-//                         <Icon name="robot" size={32} color="#7b61ff" />
+//                         <Icon name="robot" size={32} color="#195ed2" />
 //                         <Text style={styles.navTextSoon}>AI coming soon</Text>
 //                     </TouchableOpacity>
 
@@ -336,7 +336,7 @@
 //     aiButton: { alignItems: 'center', justifyContent: 'center' },
 //     navTextSoon: {
 //         fontSize: 12,
-//         color: '#7b61ff',
+//         color: '#195ed2',
 //         marginTop: 6,
 //         fontWeight: '600',
 //         textAlign: 'center',
@@ -345,14 +345,16 @@
 // });
 // src/screens/ContactUsScreen.js
 // src/screens/ContactUsScreen.js
+// src/screens/ContactUsScreen.js
 import React, { useState } from 'react';
 import {
-    View, Text, TextInput, TouchableOpacity, StyleSheet,
+    View, Text, StatusBar, TextInput, TouchableOpacity, StyleSheet,
     ScrollView, Alert, SafeAreaView, KeyboardAvoidingView,
-    Platform, ActivityIndicator, Linking
+    Platform, ActivityIndicator, Linking, useWindowDimensions
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import firestore from '@react-native-firebase/firestore';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // --------- Admin contact shown in the UI ----------
 const PHONE = '+919833211999';
@@ -360,40 +362,33 @@ const EMAIL = 'support@abseducation.in';
 const ADDRESS_LINE = 'ABS Educational Solution, Bhayandar (W), Mumbai';
 const MAP_Q = encodeURIComponent(ADDRESS_LINE);
 
-// --------- Email transport: Formspree (REQUIRED: put your id) ----------
-const FORMSPREE_FORM_ID = 'meqboapg'; // <-- e.g. "xyzzabcd"
+// --------- Email transport: Formspree ----------
+const FORMSPREE_FORM_ID = 'meqboapg';
 const FORMSPREE_URL = `https://formspree.io/f/${FORMSPREE_FORM_ID}`;
 
 async function sendEmailViaFormspree({ name, email, message }) {
-    // if (!FORMSPREE_FORM_ID || FORMSPREE_FORM_ID === 'xzzbzqze') {
-    //     throw new Error('Formspree form id missing. Set FORMSPREE_FORM_ID.');
-    // }
-
-    // Formspree accepts JSON; “email” should be the sender reply-to
     const res = await fetch(FORMSPREE_URL, {
         method: 'POST',
-        headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-        },
+        headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
         body: JSON.stringify({
             name,
-            email,               // reply-to
+            email,                 // reply-to
             message,
-            _subject: `New contact from ${name}`,   // optional
-            // you can add any extra fields your Formspree template uses
+            _subject: `New contact from ${name}`,
         }),
     });
-
     const text = await res.text().catch(() => '');
-    if (!res.ok) {
-        throw new Error(text || `Formspree error ${res.status}`);
-    }
-    // Typical success body is JSON like { ok: true, ... }
+    if (!res.ok) throw new Error(text || `Formspree error ${res.status}`);
     return true;
 }
 
+const BOTTOM_BAR_BASE = 56;
+
 export default function ContactUsScreen({ navigation }) {
+    const insets = useSafeAreaInsets();
+    const { width } = useWindowDimensions();
+    const scale = Math.min(Math.max(width / 390, 0.9), 1.12);
+
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [message, setMessage] = useState('');
@@ -404,7 +399,6 @@ export default function ContactUsScreen({ navigation }) {
         const e = email.trim();
         const m = message.trim();
         const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
-
         if (!n || !e || !m) { Alert.alert('Missing info', 'Please fill all fields.'); return false; }
         if (!emailOk) { Alert.alert('Invalid email', 'Please enter a valid email address.'); return false; }
         if (m.length < 10) { Alert.alert('Message too short', 'Please add a few more details.'); return false; }
@@ -413,28 +407,22 @@ export default function ContactUsScreen({ navigation }) {
 
     const handleSubmit = async () => {
         if (!validate()) return;
-
         try {
             setLoading(true);
-
-            // 1) Store in Firestore (kept as-is)
+            // 1) Save to Firestore
             await firestore().collection('contactMessages').add({
                 name: name.trim(),
                 email: email.trim(),
                 message: message.trim(),
                 createdAt: firestore.FieldValue.serverTimestamp(),
             });
-
-            // 2) Email to admin via Formspree
+            // 2) Email via Formspree
             await sendEmailViaFormspree({
                 name: name.trim(),
                 email: email.trim(),
                 message: message.trim(),
             });
-
-            setName('');
-            setEmail('');
-            setMessage('');
+            setName(''); setEmail(''); setMessage('');
             Alert.alert('✅ Message Sent', 'Your message has been emailed to our team. We’ll get back to you soon.');
         } catch (err) {
             console.log('Contact send error:', err);
@@ -452,10 +440,54 @@ export default function ContactUsScreen({ navigation }) {
     const openMaps = () =>
         Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${MAP_Q}`);
 
+    const bottomPad = Math.max(insets.bottom, 10);
+    const bottomBarMinH = BOTTOM_BAR_BASE + bottomPad;
+
     return (
-        <SafeAreaView style={styles.safe}>
+        // <SafeAreaView style={styles.wrap}>
+        //     <StatusBar barStyle="light-content" backgroundColor="#195ed2" />
+
+        //     {/* ✅ Blue header (visible) */}
+        //     <View
+        //         style={[
+        //             styles.header,
+        //             {
+        //                 paddingTop: insets.top + 12,
+        //                 paddingBottom: 16,
+        //                 paddingHorizontal: 16,
+        //             },
+        //         ]}
+        //     >
+        //         <View style={styles.headerRow}>
+        //             <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={{ top: 8, left: 8, right: 8, bottom: 8 }}>
+        //                 <Icon name="arrow-left" size={24} color="#fff" />
+        //             </TouchableOpacity>
+        //             <Text style={[styles.headerTitle, { fontSize: 20 * scale }]}>Contact Us</Text>
+        //             <View style={{ width: 24 }} />
+        //         </View>
+        //     </View>
+
+        //     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+        //         <ScrollView
+        //             contentContainerStyle={[
+        //                 styles.scroll,
+        //                 { paddingBottom: bottomBarMinH + 16 }, // ✅ ensure full scroll above bottom bar
+        //             ]}
+        //             showsVerticalScrollIndicator={false}
+        //         >
+        <SafeAreaView style={styles.wrap}>
+            <StatusBar barStyle="light-content" backgroundColor="#195ed2" />
+
             <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-                <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: 100 }]} showsVerticalScrollIndicator={false}>
+                <ScrollView
+                    showsVerticalScrollIndicator={false}
+                    contentContainerStyle={{
+                        padding: 16,
+                        paddingBottom: 120,   // room for bottom nav
+                        paddingTop: 12,       // small breathing room under the blue header
+                    }}
+                >
+                    {/* Intro */}
                     <View style={styles.hero}>
                         <View style={styles.heroIconWrap}>
                             <Icon name="headset" size={28} color="#166534" />
@@ -466,6 +498,7 @@ export default function ContactUsScreen({ navigation }) {
                         </View>
                     </View>
 
+                    {/* Quick Actions */}
                     <View style={styles.quickGrid}>
                         <TouchableOpacity style={styles.quickCard} onPress={openDialer} activeOpacity={0.8}>
                             <Icon name="phone" size={22} color="#166534" />
@@ -492,12 +525,14 @@ export default function ContactUsScreen({ navigation }) {
                         </TouchableOpacity>
                     </View>
 
+                    {/* Divider */}
                     <View style={styles.dividerRow}>
                         <View style={styles.divider} />
                         <Text style={styles.dividerText}>Send us a message</Text>
                         <View style={styles.divider} />
                     </View>
 
+                    {/* Form */}
                     <View style={styles.formCard}>
                         <View style={styles.inputRow}>
                             <Icon name="account" size={20} color="#6b7280" style={styles.inputIcon} />
@@ -558,6 +593,7 @@ export default function ContactUsScreen({ navigation }) {
                         </View>
                     </View>
 
+                    {/* Address */}
                     <View style={styles.infoCard}>
                         <View style={styles.infoRow}>
                             <Icon name="office-building-marker" size={20} color="#111827" />
@@ -571,20 +607,21 @@ export default function ContactUsScreen({ navigation }) {
                 </ScrollView>
 
                 {/* Bottom nav (fixed) */}
-                <View style={styles.bottomNav}>
-                    <TouchableOpacity style={styles.navItemActive} onPress={() => navigation.navigate('Home')}>
-                        <Icon name="home" size={22} color="#166534" />
-                        <Text style={styles.navTextActive}>Home</Text>
+                <View style={[styles.bottomNav, { paddingBottom: Math.max(insets?.bottom ?? 0, 10) }]}>
+
+                    <TouchableOpacity style={styles.navItem} activeOpacity={0.9} onPress={() => navigation.navigate('Home')}>
+                        <Icon name="home" size={22 * scale} color="#166534" />
+                        <Text style={[styles.navTextActive, { fontSize: 12 * scale }]}>Home</Text>
                     </TouchableOpacity>
 
-                    <TouchableOpacity style={styles.aiButton} onPress={() => navigation.navigate('AI')} activeOpacity={0.8}>
-                        <Icon name="robot" size={32} color="#7b61ff" />
-                        <Text style={styles.navTextSoon}>AI coming soon</Text>
+                    <TouchableOpacity style={styles.navItem} activeOpacity={0.9} onPress={() => navigation.navigate('AI')}>
+                        <Icon name="robot" size={28 * scale} color="#195ed2" />
+                        <Text style={[styles.navTextSoon, { fontSize: 12 * scale }]}>AI coming soon</Text>
                     </TouchableOpacity>
 
-                    <TouchableOpacity style={styles.navItemActive} onPress={() => navigation.navigate('Contact')}>
-                        <Icon name="contacts" size={22} color="#166534" />
-                        <Text style={styles.navTextActive}>Contact Us</Text>
+                    <TouchableOpacity style={styles.navItem} activeOpacity={0.9} onPress={() => navigation.navigate('Contact')}>
+                        <Icon name="contacts" size={22 * scale} color="#166534" />
+                        <Text style={[styles.navTextActive, { fontSize: 12 * scale }]}>Contact Us</Text>
                     </TouchableOpacity>
                 </View>
             </KeyboardAvoidingView>
@@ -592,43 +629,92 @@ export default function ContactUsScreen({ navigation }) {
     );
 }
 
-// ---------- styles (unchanged from your last version) ----------
 const RADIUS = 14;
 const styles = StyleSheet.create({
-    safe: { flex: 1, backgroundColor: '#f8fafc' },
+    wrap: { flex: 1, backgroundColor: '#f8fafc' },
+
+    // ✅ Visible blue header
+    header: {
+        backgroundColor: '#195ed2',
+        borderBottomLeftRadius: 20,
+        borderBottomRightRadius: 20,
+    },
+    headerRow: {
+        flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    },
+    headerTitle: { color: '#fff', fontWeight: '700' },
+
     scroll: { padding: 16 },
+
     hero: {
         flexDirection: 'row', gap: 12, alignItems: 'center',
         backgroundColor: '#ecfdf5', borderColor: '#bbf7d0', borderWidth: 1,
-        padding: 14, borderRadius: RADIUS, marginTop: 8, marginBottom: 14,
+        padding: 14, borderRadius: RADIUS, marginTop: 12, marginBottom: 14,
     },
-    heroIconWrap: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: '#d1fae5' },
+    heroIconWrap: {
+        width: 44, height: 44, borderRadius: 22,
+        alignItems: 'center', justifyContent: 'center',
+        backgroundColor: '#d1fae5'
+    },
     heroTitle: { fontSize: 16, fontWeight: '700', color: '#065f46' },
     heroText: { fontSize: 14, color: '#065f46' },
+
     quickGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 18 },
-    quickCard: { flexGrow: 1, minWidth: '47%', backgroundColor: '#fff', borderRadius: RADIUS, padding: 14, borderWidth: 1, borderColor: '#e5e7eb' },
+    quickCard: {
+        flexGrow: 1, minWidth: '47%', backgroundColor: '#fff',
+        borderRadius: RADIUS, padding: 14, borderWidth: 1, borderColor: '#e5e7eb'
+    },
     quickLabel: { fontSize: 12, color: '#6b7280', marginTop: 6 },
     quickValue: { fontSize: 14, fontWeight: '700', color: '#0f172a', marginTop: 2 },
+
     dividerRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
     divider: { flex: 1, height: 1, backgroundColor: '#e5e7eb' },
     dividerText: { fontSize: 12, color: '#6b7280', fontWeight: '600' },
-    formCard: { backgroundColor: '#fff', borderRadius: RADIUS, padding: 14, borderWidth: 1, borderColor: '#e5e7eb', marginBottom: 16 },
-    inputRow: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#d1d5db', borderRadius: 12, marginBottom: 10, paddingHorizontal: 10 },
+
+    formCard: {
+        backgroundColor: '#fff', borderRadius: RADIUS, padding: 14,
+        borderWidth: 1, borderColor: '#e5e7eb', marginBottom: 16
+    },
+    inputRow: {
+        flexDirection: 'row', alignItems: 'center',
+        borderWidth: 1, borderColor: '#d1d5db', borderRadius: 12,
+        marginBottom: 10, paddingHorizontal: 10
+    },
     inputIcon: { marginRight: 8 },
     inputIconTop: { marginRight: 8, marginTop: 12 },
     input: { flex: 1, fontSize: 16, color: '#111827', paddingVertical: 12 },
     multilineWrap: { alignItems: 'flex-start' },
     textarea: { minHeight: 120 },
-    submitBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#166534', paddingVertical: 14, borderRadius: 12, marginTop: 6 },
+
+    submitBtn: {
+        flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+        backgroundColor: '#166534', paddingVertical: 14, borderRadius: 12, marginTop: 6
+    },
     submitText: { color: '#fff', fontSize: 16, fontWeight: '700' },
     noteRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 },
     noteText: { color: '#6b7280', fontSize: 13 },
-    infoCard: { backgroundColor: '#f1f5f9', borderRadius: RADIUS, padding: 14, borderWidth: 1, borderColor: '#e2e8f0' },
+
+    infoCard: {
+        backgroundColor: '#f1f5f9', borderRadius: RADIUS, padding: 14,
+        borderWidth: 1, borderColor: '#e2e8f0'
+    },
     infoRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
     infoText: { color: '#111827', fontSize: 14 },
-    bottomNav: { position: 'absolute', bottom: 0, left: 0, right: 0, flexDirection: 'row', justifyContent: 'space-around', backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#e5e7eb', paddingVertical: 10 },
-    navItemActive: { alignItems: 'center' },
-    navTextActive: { color: '#166534', fontSize: 12, fontWeight: '600' },
-    aiButton: { alignItems: 'center' },
-    navTextSoon: { color: '#7b61ff', fontSize: 12, marginTop: 4 },
+
+    bottomNav: {
+        position: 'absolute',
+        bottom: 0, left: 0, right: 0,
+        flexDirection: 'row',
+        justifyContent: 'space-around',
+        alignItems: 'center',
+        backgroundColor: '#fff',
+        borderTopWidth: 1,
+        borderTopColor: '#e5e7eb',
+    },
+
+    // ✅ You referenced navItem but hadn’t defined it
+    navItem: { alignItems: 'center' },
+
+    navTextActive: { color: '#166534', fontSize: 12, fontWeight: '600', marginTop: 4 },
+    navTextSoon: { color: '#195ed2', fontSize: 12, marginTop: 4 },
 });

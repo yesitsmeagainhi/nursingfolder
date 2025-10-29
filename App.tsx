@@ -604,7 +604,16 @@ export default function App() {
 
   return (
     <NavigationContainer ref={navRef}>
-      <Stack.Navigator>
+      {/* <Stack.Navigator> */}
+      <Stack.Navigator
+        screenOptions={{
+          headerStyle: { backgroundColor: '#195ed2' },  // blue bar
+          headerTintColor: '#fff',
+          headerTitleStyle: { fontWeight: '700' },
+          headerTitleAlign: 'left',
+          headerShadowVisible: false, // optional: flat material look
+        }}
+      >
         {/* Auth */}
         <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
         <Stack.Screen name="Signup" component={SignupScreen} options={{ title: 'Create Account' }} />
