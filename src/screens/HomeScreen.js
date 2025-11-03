@@ -12,6 +12,7 @@ import Fuse from 'fuse.js';
 import { NodeBrowserDrawer } from '../components/NodeBrowserDrawer';
 import { startLocalVideoWatcher } from '../utils/localVideoWatcher';
 import SafeHeader from '../components/SafeHeader';
+// import { SafeAreaView } from 'react-native-safe-area-context';
 
 // --- De-dupe helpers ---
 const n = (s) => (s || '').toString().trim().toLowerCase();
@@ -60,11 +61,15 @@ const mergeAndDedupeByContent = (...lists) => {
 // --- UI bits ---
 const PopularCourseCard = ({ item, onPress, scale }) => (
   <TouchableOpacity onPress={onPress} style={[styles.popularCard, { width: 160 * scale, height: 200 * scale, marginRight: 16 * scale }]}>
+    {/* Ensure the bgImageUrl is correctly used */}
     <ImageBackground
-      source={{ uri: item.imageUrl || 'https://images.unsplash.com/photo-1552664730-d307ca884978?q=80&w=2070' }}
+      source={{ uri: item.bgImageUrl || 'https://default-image-url.com' }}  // Fallback image if bgImageUrl is missing
       style={[styles.popularCardImage, { padding: 12 * scale }]}
       imageStyle={{ borderRadius: 16 * scale }}
     >
+      {/* Show ActivityIndicator if image is still loading */}
+      {!item.bgImageUrl && <ActivityIndicator size="small" color="#fff" />}
+
       <View style={styles.popularCardOverlay} />
       <Text style={[styles.popularCardTitle, { fontSize: 16 * scale }]} numberOfLines={2}>
         {item.name}
@@ -72,6 +77,8 @@ const PopularCourseCard = ({ item, onPress, scale }) => (
     </ImageBackground>
   </TouchableOpacity>
 );
+
+
 
 const SearchResultCard = ({ item, subtitle, onPress, scale }) => {
   const iconName =
@@ -126,7 +133,7 @@ export default function HomeScreen({ navigation }) {
   useEffect(() => {
     const q = firestore()
       .collection('nodes')
-      .where('parentId', '==', null)
+      .where('parentId', '==', null)  // Only get the root folders
       .where('type', '==', 'folder')
       .orderBy('order', 'asc');
 
@@ -135,8 +142,8 @@ export default function HomeScreen({ navigation }) {
         const items = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         const featured = items.find(i => i.order === 1) || items[0] || null;
         const popular = items.filter(i => i?.id !== featured?.id);
-        setFeaturedCourse(featured);
-        setPopularCourses(popular);
+        setFeaturedCourse(featured);  // Make sure to include the bgImageUrl in the item
+        setPopularCourses(popular);   // Same for popular courses
         setLoading(false);
       },
       err => {
@@ -147,6 +154,8 @@ export default function HomeScreen({ navigation }) {
 
     return () => unsub && unsub();
   }, []);
+
+
 
   // 2) Build a local index (Fuse)
   useEffect(() => {
@@ -279,19 +288,18 @@ export default function HomeScreen({ navigation }) {
   const bottomBarMinH = BOTTOM_BAR_BASE + bottomPad;
 
   return (
-    <SafeAreaView style={styles.wrap} edges={['bottom']}>
-      {/* Translucent so we fully control the spacing */}
-      <StatusBar translucent barStyle="light-content" backgroundColor="transparent" />
-
+    <SafeAreaView style={{ flex: 1 }} edges={['left', 'right']}>
+      <StatusBar barStyle="light-content" backgroundColor="#195ed2" translucent={false} />
       <ScrollView
+        contentInsetAdjustmentBehavior="automatic"
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={{
-          paddingBottom: bottomBarMinH + 12,   // keep content above bottom nav
-          minHeight: height - bottomBarMinH,   // center on tall screens, scroll on short
+          paddingBottom: bottomBarMinH + 12,
+          minHeight: height - bottomBarMinH,
         }}
         showsVerticalScrollIndicator={false}
       >
-        {/* Safe, consistent header */}
+
         <SafeHeader
           scale={scale}
           bg="#195ed2"
@@ -318,7 +326,7 @@ export default function HomeScreen({ navigation }) {
           </View>
         </SafeHeader>
 
-        {/* Results or Featured + Popular */}
+
         {showSearchResults ? (
           <>
             {isSearching ? (
@@ -342,43 +350,42 @@ export default function HomeScreen({ navigation }) {
               </View>
             )}
           </>
-        ) : (
-          <>
-            {featuredCourse && (
-              <TouchableOpacity onPress={() => onItemPress(featuredCourse)} activeOpacity={0.9}>
-                <ImageBackground
-                  source={{ uri: featuredCourse.imageUrl || 'https://blogger.googleusercontent.com/img/a/AVvXsEhoUgeOOOFDhUPdXnaIqgBHixqU9mhuWfO-PmMU7Ez4I356VndPIOnU3U6jxsbr6L9tdJ-06g7Jt6e7cphzVqx_uCPkcS9cvG1lqI76IlxHLyUJxEjqa-wYXeR3OHUB6x4hk10JMIhH400wbIgoTPhx3ipvJEyz868up_ux-KRW3D9CXPvMJacEMqB0' }}
-                  style={[styles.featuredCard, { height: 200 * scale, margin: 20 * scale, padding: 16 * scale, borderRadius: 20 * scale }]}
-                  imageStyle={{ borderRadius: 20 * scale }}
-                >
-                  <View style={styles.featuredTextContainer}>
-                    <Text style={[styles.featuredTitle, { fontSize: 20 * scale }]} numberOfLines={2}>
-                      {featuredCourse.name}
-                    </Text>
-                    <Text style={[styles.featuredSubtitle, { fontSize: 14 * scale }]} numberOfLines={1}></Text>
-                  </View>
-                  <View style={[styles.playButton, { width: 44 * scale, height: 44 * scale, borderRadius: 22 * scale }]}>
-                    <Icon name="play" size={24 * scale} color="#195ed2" />
-                  </View>
-                </ImageBackground>
-              </TouchableOpacity>
-            )}
+        )
+          : (
+            <>
+              {featuredCourse && (
+                <TouchableOpacity onPress={() => onItemPress(featuredCourse)} activeOpacity={0.9}>
+                  <ImageBackground
+                    source={{ uri: featuredCourse?.bgImageUrl || 'https://default-image-url.com' }}
+                    style={[styles.featuredCard, { height: 200 * scale, margin: 20 * scale, padding: 16 * scale, borderRadius: 20 * scale }]}
+                    imageStyle={{ borderRadius: 20 * scale }}
+                  >
+                    <View style={styles.featuredTextContainer}>
+                      <Text style={[styles.featuredTitle, { fontSize: 20 * scale }]} numberOfLines={2}>
+                        {featuredCourse?.name}
+                      </Text>
+                      <Text style={[styles.featuredSubtitle, { fontSize: 14 * scale }]} numberOfLines={1}></Text>
+                    </View>
+                  </ImageBackground>
 
-            <FlatList
-              data={popularCourses}
-              keyExtractor={(it) => it.id}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              renderItem={({ item }) => (
-                <PopularCourseCard item={item} onPress={() => onItemPress(item)} scale={scale} />
+                </TouchableOpacity>
               )}
-              contentContainerStyle={{ paddingHorizontal: 20 * scale, paddingBottom: 12 * scale }}
-            />
-          </>
-        )}
+
+              <FlatList
+                data={popularCourses}
+                keyExtractor={(it) => it.id}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                renderItem={({ item }) => (
+                  <PopularCourseCard item={item} onPress={() => onItemPress(item)} scale={scale} />
+                )}
+                contentContainerStyle={{ paddingHorizontal: 20 * scale, paddingBottom: 12 * scale }}
+              />
+            </>
+          )}
       </ScrollView>
 
-      {/* Drawer */}
+
       <NodeBrowserDrawer
         visible={showNodeBrowser}
         onClose={() => setShowNodeBrowser(false)}
@@ -408,7 +415,7 @@ export default function HomeScreen({ navigation }) {
         }}
       />
 
-      {/* Bottom Nav (safe-area aware) */}
+
       <View
         style={[
           styles.bottomNav,
