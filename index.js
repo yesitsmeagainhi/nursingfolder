@@ -4,6 +4,7 @@
 
 // index.js (top-level entry)
 // index.js (RN entry file)
+import './src/push/handlers';
 import 'react-native-gesture-handler';
 import { AppRegistry } from 'react-native';
 import messaging from '@react-native-firebase/messaging';
