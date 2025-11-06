@@ -34,7 +34,7 @@ export default function AIScreen({ navigation }) {
                     showsVerticalScrollIndicator={false}
                 >
                     <View style={styles.container}>
-                        <Icon name="robot" size={64 * scale} color="#2980b9" />
+                        <Icon name="robot" size={64 * scale} color="#195ed2" />
                         <Text style={[styles.title, { fontSize: 22 * scale }]}>Coming Soon</Text>
                         <Text style={[styles.text, { fontSize: 15 * scale }]}>
                             This is your AI hub — coming soon with smart features for learning and productivity!

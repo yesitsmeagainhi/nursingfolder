@@ -262,6 +262,8 @@ export async function startLocalVideoWatcher() {
                             id: 'open',
                             launchActivity: 'default',
                         },
+                        data: { nav: 'Notifications', screen: 'notifications', type: 'notifications' },
+
                     },
                 });
 

@@ -437,14 +437,276 @@
 //   openTxt: { color: '#fff', fontWeight: '700' },
 // });
 
+// // src/screens/ViewerScreen.js
+// import React, { useEffect, useMemo, useRef, useState } from 'react';
+// import {
+//   View, Text, StyleSheet, Dimensions, ScrollView,
+// } from 'react-native';
+// import { WebView } from 'react-native-webview';
+// import Video from 'react-native-video';
 
+// const { width } = Dimensions.get('window');
+// const VIDEO_H = Math.round((width - 24) * 9 / 16);
 
+// // ── helpers ─────────────────────────────────────────────────────────
+// function getDriveId(input) {
+//   try {
+//     if (!input) return '';
+//     let s = input.trim();
+//     if (!/^https?:\/\//i.test(s)) s = `https://${s}`;
+//     const u = new URL(s);
+//     const m = u.pathname.match(/\/file\/d\/([^/]+)/);
+//     return (m && m[1]) || u.searchParams.get('id') || '';
+//   } catch { return ''; }
+// }
 
+// function driveUrls(raw) {
+//   const id = getDriveId(raw);
+//   if (!id) return null;
+//   return {
+//     direct: `https://drive.google.com/uc?export=download&id=${id}`,
+//     preview: `https://drive.google.com/file/d/${id}/preview?autoplay=1&mute=1`,
+//     baseUrl: 'https://drive.google.com',
+//   };
+// }
 
-import React, { useMemo, useState } from 'react';
+// function isYouTube(raw) {
+//   try {
+//     const u = new URL(raw);
+//     const h = u.hostname.toLowerCase();
+//     return h.includes('youtube.com') || h.includes('youtu.be');
+//   } catch { return false; }
+// }
+
+// function ytId(raw) {
+//   try {
+//     let s = raw.trim();
+//     if (!/^https?:\/\//i.test(s)) s = `https://${s}`;
+//     const u = new URL(s);
+//     const h = u.hostname.toLowerCase();
+//     if (h.includes('youtu.be')) return u.pathname.slice(1);
+//     if (u.pathname.startsWith('/shorts/')) return (u.pathname.split('/')[2] || '');
+//     if (u.pathname.startsWith('/embed/')) return (u.pathname.split('/')[2] || '');
+//     return u.searchParams.get('v') || '';
+//   } catch { return ''; }
+// }
+
+// function ytEmbed(raw) {
+//   const id = ytId(raw);
+//   return id ? `https://www.youtube-nocookie.com/embed/${id}?rel=0&modestbranding=1&playsinline=1&iv_load_policy=3` : '';
+// }
+
+// function htmlIframe(src) {
+//   return `<!doctype html><html><head>
+// <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+// <style>
+//   html,body{margin:0;height:100%;background:#000}
+//   #wrap{position:fixed;inset:0}
+//   iframe{width:100%;height:100%;border:0;background:#000}
+// </style></head>
+// <body><div id="wrap">
+// <iframe src="${src}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen" allowfullscreen></iframe>
+// </div></body></html>`;
+// }
+
+// function htmlVideo(src) {
+//   return `<!doctype html><html><head>
+// <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+// <style>
+//   html,body{margin:0;height:100%;background:#000}
+//   #wrap{position:fixed;inset:0;display:flex;align-items:center;justify-content:center}
+//   video{width:100%;height:100%;background:#000}
+// </style></head>
+// <body>
+//   <div id="wrap">
+//     <video id="v" controls playsinline autoplay muted>
+//       <source src="${src}">
+//     </video>
+//     <script>
+//       const v = document.getElementById('v');
+//       v.addEventListener('canplay', () => {
+//         window.ReactNativeWebView && window.ReactNativeWebView.postMessage('started');
+//       });
+//     </script>
+//   </div>
+// </body></html>`;
+// }
+
+// // ── component ───────────────────────────────────────────────────────
+// export default function ViewerScreen({ route }) {
+//   const { title = '', url = '', type = 'video' } = route?.params || {};
+//   const [mode, setMode] = useState('page'); // 'native' | 'html5' | 'preview' | 'yt' | 'page'
+//   const [loading, setLoading] = useState(false);
+//   const [buffering, setBuffering] = useState(false);
+//   const [started, setStarted] = useState(false);
+//   const guardRef = useRef(null);
+
+//   const yt = useMemo(() => (isYouTube(url) ? ytEmbed(url) : ''), [url]);
+//   const g = useMemo(() => driveUrls(url), [url]);
+
+//   // pick initial mode whenever url/type changes
+//   useEffect(() => {
+//     setStarted(false);
+//     setLoading(false);
+//     setBuffering(false);
+//     if (guardRef.current) clearTimeout(guardRef.current);
+
+//     if (type !== 'video') { setMode('page'); return; }
+//     if (yt) { setMode('yt'); return; }
+//     if (g) { setMode('native'); return; }
+//     setMode('page');
+//   }, [url, type, yt, g]);
+
+//   // guard for slow native Drive → fallback to HTML5
+//   useEffect(() => {
+//     if (mode === 'native' && !started) {
+//       setLoading(true);
+//       guardRef.current = setTimeout(() => {
+//         if (!started) setMode('html5');
+//       }, 10000);
+//     }
+//     return () => { if (guardRef.current) clearTimeout(guardRef.current); };
+//   }, [mode, started]);
+
+//   return (
+//     <ScrollView style={{ flex: 1, backgroundColor: '#fff' }} contentContainerStyle={{ padding: 12 }}>
+//       <View style={{ height: VIDEO_H, backgroundColor: '#000', borderRadius: 12, overflow: 'hidden' }}>
+//         {/* Tier 1: Drive native (single controls) */}
+//         {type === 'video' && mode === 'native' && g && (
+//           <View style={{ flex: 1 }}>
+//             <Video
+//               key={g.direct}
+//               source={{
+//                 uri: g.direct,
+//                 headers: {
+//                   'User-Agent': 'Mozilla/5.0',
+//                   'Accept': '*/*',
+//                   'Referer': 'https://drive.google.com/',
+//                 },
+//               }}
+//               style={{ width: '100%', height: '100%' }}
+//               resizeMode="contain"
+//               controls
+//               paused={false}
+//               playInBackground={false}
+//               playWhenInactive={false}
+//               ignoreSilentSwitch="ignore"
+//               onLoadStart={() => { setLoading(true); setBuffering(false); }}
+//               onLoad={() => { setLoading(false); setStarted(true); }}
+//               onReadyForDisplay={() => { setLoading(false); setStarted(true); }}
+//               onProgress={(p) => {
+//                 if (!started && p?.currentTime > 0) { setStarted(true); setLoading(false); }
+//               }}
+//               onBuffer={({ isBuffering }) => setBuffering(isBuffering)}
+//               onError={() => setMode('html5')}
+//               bufferConfig={{
+//                 minBufferMs: 15000,
+//                 maxBufferMs: 50000,
+//                 bufferForPlaybackMs: 2500,
+//                 bufferForPlaybackAfterRebufferMs: 5000,
+//               }}
+//               automaticallyWaitsToMinimizeStalling
+//             />
+//             {(loading || buffering) && (
+//               <View style={styles.overlay}>
+//                 <Text style={styles.overlayTxt}>{loading ? 'Loading…' : 'Buffering…'}</Text>
+//               </View>
+//             )}
+//           </View>
+//         )}
+
+//         {/* Tier 2: HTML5 video in WebView (single controls) */}
+//         {type === 'video' && mode === 'html5' && g && (
+//           <WebView
+//             key={'html5:' + g.direct}
+//             source={{ html: htmlVideo(g.direct), baseUrl: g.baseUrl }}
+//             style={{ flex: 1 }}
+//             javaScriptEnabled
+//             domStorageEnabled
+//             thirdPartyCookiesEnabled
+//             allowsFullscreenVideo
+//             allowsInlineMediaPlayback
+//             mediaPlaybackRequiresUserAction={false}
+//             onMessage={(e) => { if (e?.nativeEvent?.data === 'started') setStarted(true); }}
+//             onError={() => setMode('preview')}
+//             startInLoadingState
+//             setSupportMultipleWindows={false}
+//           />
+//         )}
+
+//         {/* Tier 3: Drive preview (Google overlay; last resort) */}
+//         {type === 'video' && mode === 'preview' && g && (
+//           <WebView
+//             key={'preview:' + g.preview}
+//             source={{ html: htmlIframe(g.preview), baseUrl: g.baseUrl }}
+//             style={{ flex: 1 }}
+//             javaScriptEnabled
+//             domStorageEnabled
+//             thirdPartyCookiesEnabled
+//             allowsFullscreenVideo
+//             allowsInlineMediaPlayback
+//             mediaPlaybackRequiresUserAction={false}
+//             startInLoadingState
+//             setSupportMultipleWindows={false}
+//           />
+//         )}
+
+//         {/* YouTube */}
+//         {type === 'video' && mode === 'yt' && !!yt && (
+//           <WebView
+//             key={'yt:' + yt}
+//             source={{ html: htmlIframe(yt), baseUrl: 'https://www.youtube-nocookie.com' }}
+//             style={{ flex: 1 }}
+//             javaScriptEnabled
+//             domStorageEnabled
+//             thirdPartyCookiesEnabled
+//             allowsFullscreenVideo
+//             allowsInlineMediaPlayback
+//             mediaPlaybackRequiresUserAction={false}
+//             startInLoadingState
+//             setSupportMultipleWindows={false}
+//             onShouldStartLoadWithRequest={(req) => !/^intent:|^vnd\.youtube:/i.test(req?.url || '')}
+//           />
+//         )}
+
+//         {/* Non-video or generic URL */}
+//         {(type !== 'video' || mode === 'page') && !!url && (
+//           <WebView
+//             key={'page:' + url}
+//             source={{ uri: url }}
+//             style={{ flex: 1 }}
+//             javaScriptEnabled
+//             domStorageEnabled
+//             thirdPartyCookiesEnabled
+//             allowsFullscreenVideo
+//             allowsInlineMediaPlayback
+//             mediaPlaybackRequiresUserAction={false}
+//             startInLoadingState
+//             setSupportMultipleWindows={false}
+//           />
+//         )}
+//       </View>
+
+//       {!!title && <Text style={styles.title}>{title}</Text>}
+//     </ScrollView>
+//   );
+// }
+
+// const styles = StyleSheet.create({
+//   title: { marginTop: 8, fontSize: 18, fontWeight: '800', color: '#111827' },
+//   overlay: {
+//     ...StyleSheet.absoluteFillObject,
+//     backgroundColor: 'rgba(0,0,0,0.25)',
+//     alignItems: 'center',
+//     justifyContent: 'center',
+//   },
+//   overlayTxt: { color: '#fff', fontWeight: '700' },
+// });
+
+// src/screens/ViewerScreen.js
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  View, ActivityIndicator, StyleSheet, Text, ScrollView,
-  Dimensions, TouchableOpacity, Linking
+  View, Text, StyleSheet, Dimensions, ScrollView, ActivityIndicator, Platform,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import Video from 'react-native-video';
@@ -452,129 +714,190 @@ import Video from 'react-native-video';
 const { width } = Dimensions.get('window');
 const VIDEO_H = Math.round((width - 24) * 9 / 16);
 
+// ── helpers ─────────────────────────────────────────────────────────
+function getDriveId(input) {
+  try {
+    if (!input) return '';
+    let s = input.trim();
+    if (!/^https?:\/\//i.test(s)) s = `https://${s}`;
+    const u = new URL(s);
+    const m = u.pathname.match(/\/file\/d\/([^/]+)/);
+    return (m && m[1]) || u.searchParams.get('id') || '';
+  } catch { return ''; }
+}
+
+function driveUrls(raw) {
+  const id = getDriveId(raw);
+  if (!id) return null;
+  return {
+    direct: `https://drive.google.com/uc?export=download&id=${id}`,
+    preview: `https://drive.google.com/file/d/${id}/preview?autoplay=1&mute=1`,
+    baseUrl: 'https://drive.google.com',
+  };
+}
+
+function isYouTube(raw) {
+  try {
+    const u = new URL(raw);
+    const h = u.hostname.toLowerCase();
+    return h.includes('youtube.com') || h.includes('youtu.be');
+  } catch { return false; }
+}
+
 function ytId(raw) {
-  if (!raw) return '';
   try {
     let s = raw.trim();
     if (!/^https?:\/\//i.test(s)) s = `https://${s}`;
     const u = new URL(s);
-    const host = u.hostname.replace(/^www\./, '').toLowerCase();
-    if (host.includes('youtu.be')) return u.pathname.slice(1);
+    const h = u.hostname.toLowerCase();
+    if (h.includes('youtu.be')) return u.pathname.slice(1);
     if (u.pathname.startsWith('/shorts/')) return (u.pathname.split('/')[2] || '');
     if (u.pathname.startsWith('/embed/')) return (u.pathname.split('/')[2] || '');
-    if (host.includes('youtube')) return u.searchParams.get('v') || '';
-    return '';
+    return u.searchParams.get('v') || '';
   } catch { return ''; }
+}
+
+function ytEmbed(raw) {
+  const id = ytId(raw);
+  return id ? `https://www.youtube-nocookie.com/embed/${id}?rel=0&modestbranding=1&playsinline=1&iv_load_policy=3` : '';
 }
 
 function htmlIframe(src) {
   return `<!doctype html><html><head>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
-<style>html,body{margin:0;height:100%;background:#000}#wrap{position:fixed;inset:0}
-iframe{width:100%;height:100%;border:0;background:#000}</style></head>
+<style>
+  html,body{margin:0;height:100%;background:#000}
+  #wrap{position:fixed;inset:0}
+  iframe{width:100%;height:100%;border:0;background:#000}
+</style></head>
 <body><div id="wrap">
 <iframe src="${src}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen" allowfullscreen></iframe>
 </div></body></html>`;
 }
 
-function toPlayable(raw, type) {
-  if (!raw) return { mode: 'page', url: '', baseUrl: 'https://localhost' };
-  let s = raw.trim();
-  if (!/^https?:\/\//i.test(s)) s = `https://${s}`;
-
-  try {
-    const u = new URL(s);
-    const host = u.hostname.replace(/^www\./, '').toLowerCase();
-
-    // YouTube -> embed
-    if (type === 'video' && (host.includes('youtube') || host.includes('youtu.be'))) {
-      const id = ytId(s);
-      if (id) {
-        const embed = `https://www.youtube-nocookie.com/embed/${id}?playsinline=1&modestbranding=1&rel=0&iv_load_policy=3&fs=1&autohide=1&showinfo=0&controls=1`;
-        return { mode: 'yt-embed', url: embed, baseUrl: 'https://www.youtube-nocookie.com' };
-      }
-      return { mode: 'page', url: s, baseUrl: u.origin };
-    }
-
-    // Google Drive -> prefer DIRECT file for native player
-    if (host.includes('drive.google.com') || host.includes('docs.google.com')) {
-      const m = u.pathname.match(/\/file\/d\/([^/]+)/);
-      const id = (m && m[1]) || u.searchParams.get('id') || '';
-      if (id) {
-        const direct = `https://drive.google.com/uc?export=download&id=${id}`;
-        const preview = `https://drive.google.com/file/d/${id}/preview`;
-        return { mode: 'drive-native', url: direct, preview, baseUrl: 'https://drive.google.com' };
-      }
-      return { mode: 'page', url: s, baseUrl: u.origin };
-    }
-
-    if (/\.(mp4|m4v|mov|m3u8)(\?|#|$)/i.test(s)) {
-      return { mode: 'direct', url: s, baseUrl: u.origin };
-    }
-
-    return { mode: 'page', url: s, baseUrl: u.origin };
-  } catch {
-    return { mode: 'page', url: s, baseUrl: 'https://localhost' };
-  }
+function htmlVideo(src) {
+  // single HTML5 player (no extra overlay controls)
+  return `<!doctype html><html><head>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+<style>
+  html,body{margin:0;height:100%;background:#000}
+  #wrap{position:fixed;inset:0;display:flex;align-items:center;justify-content:center}
+  video{width:100%;height:100%;background:#000}
+  #loader{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font-family:system-ui, Arial}
+</style></head>
+<body>
+  <div id="wrap">
+    <div id="loader">Loading…</div>
+    <video id="v" controls playsinline autoplay muted>
+      <source src="${src}">
+    </video>
+  </div>
+  <script>
+    const v = document.getElementById('v');
+    const loader = document.getElementById('loader');
+    function hideLoader(){ if(loader) loader.style.display='none'; }
+    v.addEventListener('canplay', () => {
+      hideLoader();
+      window.ReactNativeWebView && window.ReactNativeWebView.postMessage('started');
+    });
+    v.addEventListener('waiting', () => { if(loader) loader.style.display='flex'; });
+    v.addEventListener('playing', () => hideLoader());
+  </script>
+</body></html>`;
 }
 
+// ── component ───────────────────────────────────────────────────────
 export default function ViewerScreen({ route }) {
   const { title = '', url = '', type = 'video' } = route?.params || {};
-  const playable = useMemo(() => toPlayable(url, type), [url, type]);
-  const [driveFallback, setDriveFallback] = useState(false); // switch to /preview if direct stream fails
+  const [mode, setMode] = useState('page'); // 'native' | 'html5' | 'preview' | 'yt' | 'page'
+  const [loading, setLoading] = useState(false);
+  const [buffering, setBuffering] = useState(false);
+  const [started, setStarted] = useState(false);
+  const guardRef = useRef(null);
 
-  if (type !== 'video') {
-    return (
-      <WebView
-        source={{ uri: playable.url || url }}
-        startInLoadingState
-        renderLoading={() => <ActivityIndicator style={StyleSheet.absoluteFill} />}
-        javaScriptEnabled
-        domStorageEnabled
-        thirdPartyCookiesEnabled
-        allowsFullscreenVideo
-        onShouldStartLoadWithRequest={() => true}
-        setSupportMultipleWindows={false}
-      />
-    );
-  }
+  const yt = useMemo(() => (isYouTube(url) ? ytEmbed(url) : ''), [url]);
+  const g = useMemo(() => driveUrls(url), [url]);
 
-  const isDriveNative = playable.mode === 'drive-native' && !driveFallback;
-  const isDrivePreview = playable.mode === 'drive-native' && driveFallback;
-  const isYtEmbed = playable.mode === 'yt-embed';
+  // choose initial mode on changes
+  useEffect(() => {
+    setStarted(false);
+    setLoading(false);
+    setBuffering(false);
+    if (guardRef.current) clearTimeout(guardRef.current);
+
+    if (type !== 'video') { setMode('page'); return; }
+    if (yt) { setMode('yt'); return; }
+    if (g) { setMode('native'); return; }
+    setMode('page');
+  }, [url, type, yt, g]);
+
+  // guard for slow native drive stream → fallback to HTML5 after 10s
+  useEffect(() => {
+    if (mode === 'native' && !started) {
+      setLoading(true);
+      guardRef.current = setTimeout(() => {
+        if (!started) setMode('html5');
+      }, 10000);
+    }
+    return () => { if (guardRef.current) clearTimeout(guardRef.current); };
+  }, [mode, started]);
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: '#fff' }} contentContainerStyle={{ padding: 12 }}>
-      <View style={styles.playerBox}>
-        {isDriveNative ? (
-          <Video
-            source={{ uri: playable.url }}
-            style={styles.playerSurface}              // ⬅️ use this style
-            resizeMode="contain"
-            controls
-            paused={false}
-            playInBackground={false}
-            playWhenInactive={false}
-            ignoreSilentSwitch="ignore"
-            onLoadStart={() => setLoading(true)}
-            onLoad={() => setLoading(false)}
-            onBuffer={({ isBuffering }) => setLoading(isBuffering)}
-            onReadyForDisplay={() => setLoading(false)}
-            onError={() => {
-              setDriveFallback(true);
-              setLoading(true);
-            }}
-            bufferConfig={{
-              minBufferMs: 15000,
-              maxBufferMs: 50000,
-              bufferForPlaybackMs: 2500,
-              bufferForPlaybackAfterRebufferMs: 5000,
-            }}
-          />
-        ) : isDrivePreview ? (
+      <View style={{ height: VIDEO_H, backgroundColor: '#000', borderRadius: 12, overflow: 'hidden' }}>
+        {/* Tier 1: Drive native (single controls) */}
+        {type === 'video' && mode === 'native' && g && (
+          <View style={{ flex: 1 }}>
+            <Video
+              key={g.direct}
+              source={{
+                uri: g.direct,
+                headers: {
+                  'User-Agent': 'Mozilla/5.0',
+                  'Accept': '*/*',
+                  'Referer': 'https://drive.google.com/',
+                },
+              }}
+              style={{ width: '100%', height: '100%' }}
+              resizeMode="contain"
+              controls
+              paused={false}
+              playInBackground={false}
+              playWhenInactive={false}
+              ignoreSilentSwitch="ignore"
+              onLoadStart={() => { setLoading(true); setBuffering(false); }}
+              onLoad={() => { setLoading(false); setStarted(true); }}
+              onReadyForDisplay={() => { setLoading(false); setStarted(true); }}
+              onProgress={(p) => {
+                if (!started && p?.currentTime > 0) { setStarted(true); setLoading(false); }
+              }}
+              onBuffer={({ isBuffering }) => setBuffering(isBuffering)}
+              onError={() => setMode('html5')}
+              bufferConfig={{
+                minBufferMs: 15000,
+                maxBufferMs: 50000,
+                bufferForPlaybackMs: 2500,
+                bufferForPlaybackAfterRebufferMs: 5000,
+              }}
+              automaticallyWaitsToMinimizeStalling
+              // Helps with some Android devices where surface switching causes black frames
+              useTextureView={Platform.OS === 'android'}
+            />
+            {(loading || buffering) && (
+              <View style={styles.overlay}>
+                <ActivityIndicator size="large" />
+                <Text style={styles.overlayTxt}>{loading ? 'Loading…' : 'Buffering…'}</Text>
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* Tier 2: HTML5 video in WebView (single controls) */}
+        {type === 'video' && mode === 'html5' && g && (
           <WebView
-            source={{ html: htmlIframe(playable.preview), baseUrl: playable.baseUrl }}
-            style={styles.playerSurface}              // ⬅️ use this style
+            key={'html5:' + g.direct}
+            source={{ html: htmlVideo(g.direct), baseUrl: g.baseUrl }}
+            style={{ flex: 1 }}
             javaScriptEnabled
             domStorageEnabled
             thirdPartyCookiesEnabled
@@ -582,100 +905,78 @@ export default function ViewerScreen({ route }) {
             allowsInlineMediaPlayback
             mediaPlaybackRequiresUserAction={false}
             startInLoadingState
-            renderLoading={() => null}
-            onLoadStart={() => setLoading(true)}
-            onLoadEnd={() => setLoading(false)}
+            onMessage={(e) => { if (e?.nativeEvent?.data === 'started') setStarted(true); }}
+            onError={() => setMode('preview')}
             setSupportMultipleWindows={false}
-            androidLayerType="hardware"
-          />
-        ) : isYtEmbed ? (
-          <WebView
-            source={{ html: htmlIframe(playable.url), baseUrl: playable.baseUrl }}
-            style={styles.playerSurface}              // ⬅️ use this style
-            javaScriptEnabled
-            domStorageEnabled
-            thirdPartyCookiesEnabled
-            allowsFullscreenVideo
-            allowsInlineMediaPlayback
-            mediaPlaybackRequiresUserAction={false}
-            startInLoadingState
-            renderLoading={() => null}
-            onLoadStart={() => setLoading(true)}
-            onLoadEnd={() => setLoading(false)}
-            setSupportMultipleWindows={false}
-            onShouldStartLoadWithRequest={(req) => {
-              const u = req?.url || '';
-              if (/^intent:|^vnd\.youtube:/i.test(u)) return false;
-              if (/youtube\.com\/watch|youtu\.be\//i.test(u) && !/\/embed\//i.test(u)) return false;
-              return true;
-            }}
-            onError={() => setLoading(false)}
-            androidLayerType="hardware"
-          />
-        ) : (
-          <WebView
-            source={{ uri: playable.url || url }}
-            style={styles.playerSurface}              // ⬅️ use this style
-            javaScriptEnabled
-            domStorageEnabled
-            thirdPartyCookiesEnabled
-            allowsFullscreenVideo
-            allowsInlineMediaPlayback
-            mediaPlaybackRequiresUserAction={false}
-            startInLoadingState
-            renderLoading={() => null}
-            onLoadStart={() => setLoading(true)}
-            onLoadEnd={() => setLoading(false)}
-            setSupportMultipleWindows={false}
-            androidLayerType="hardware"
           />
         )}
 
-        {/* 👇 Put overlay LAST so it sits on top */}
-        {loading && (
-          <View pointerEvents="none" style={styles.loadingOverlay}>
-            <ActivityIndicator size="large" color="#fff" />
-            <Text style={styles.loadingTxt}>Loading video…</Text>
-          </View>
+        {/* Tier 3: Drive preview (Google overlay; last resort) */}
+        {type === 'video' && mode === 'preview' && g && (
+          <WebView
+            key={'preview:' + g.preview}
+            source={{ html: htmlIframe(g.preview), baseUrl: g.baseUrl }}
+            style={{ flex: 1 }}
+            javaScriptEnabled
+            domStorageEnabled
+            thirdPartyCookiesEnabled
+            allowsFullscreenVideo
+            allowsInlineMediaPlayback
+            mediaPlaybackRequiresUserAction={false}
+            startInLoadingState
+            setSupportMultipleWindows={false}
+          />
+        )}
+
+        {/* YouTube */}
+        {type === 'video' && mode === 'yt' && !!yt && (
+          <WebView
+            key={'yt:' + yt}
+            source={{ html: htmlIframe(yt), baseUrl: 'https://www.youtube-nocookie.com' }}
+            style={{ flex: 1 }}
+            javaScriptEnabled
+            domStorageEnabled
+            thirdPartyCookiesEnabled
+            allowsFullscreenVideo
+            allowsInlineMediaPlayback
+            mediaPlaybackRequiresUserAction={false}
+            startInLoadingState
+            setSupportMultipleWindows={false}
+            onShouldStartLoadWithRequest={(req) => !/^intent:|^vnd\.youtube:/i.test(req?.url || '')}
+          />
+        )}
+
+        {/* Non-video or generic URL */}
+        {(type !== 'video' || mode === 'page') && !!url && (
+          <WebView
+            key={'page:' + url}
+            source={{ uri: url }}
+            style={{ flex: 1 }}
+            javaScriptEnabled
+            domStorageEnabled
+            thirdPartyCookiesEnabled
+            allowsFullscreenVideo
+            allowsInlineMediaPlayback
+            mediaPlaybackRequiresUserAction={false}
+            startInLoadingState
+            setSupportMultipleWindows={false}
+          />
         )}
       </View>
 
-
-      {!!title && <Text style={styles.title}>{title}</Text>}
-
-      {/* <TouchableOpacity onPress={() => Linking.openURL(url)} style={styles.openBtn}>
-        <Text style={styles.openTxt}>Open in YouTube / Browser</Text>
-      </TouchableOpacity> */}
+      {!!title && <Text style={styles.title}></Text>}
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   title: { marginTop: 8, fontSize: 18, fontWeight: '800', color: '#111827' },
-  openBtn: { alignSelf: 'flex-start', marginTop: 10, backgroundColor: '#195ed2', paddingHorizontal: 12, paddingVertical: 10, borderRadius: 8 },
-  openTxt: { color: '#fff', fontWeight: '700' },
-
-  playerBox: {
-    height: VIDEO_H,
-    backgroundColor: '#000',
-    borderRadius: 12,
-    overflow: 'hidden',
-    position: 'relative',     // ⬅️ important for absolute overlay
-  },
-  // Surface for WebView/Video so they sit *below* the overlay
-  playerSurface: {
+  overlay: {
     ...StyleSheet.absoluteFillObject,
-    zIndex: 0,                // ⬅️ explicitly below overlay
-  },
-  loadingOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.35)',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.35)',
-    zIndex: 100,              // ⬅️ on top
-    elevation: 100,           // ⬅️ Android stacking
+    gap: 8,
   },
-  loadingTxt: { color: '#fff', fontWeight: '600', marginTop: 8 },
-
-
+  overlayTxt: { color: '#fff', fontWeight: '700' },
 });

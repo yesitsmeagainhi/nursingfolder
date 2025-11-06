@@ -187,14 +187,22 @@
 //   link: { marginTop: 16, color: THEME, fontWeight: '600', textAlign: 'center' },
 // });
 // src/screens/LoginScreen.js
+// src/screens/LoginScreen.js
 import React, { useMemo, useState } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, StyleSheet,
-  KeyboardAvoidingView, Platform
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { signIn } from '../services/authService';
 import { THEME } from '../utils/map';
+
 
 export default function LoginScreen({ navigation }) {
   const [phone, setPhone] = useState('');
@@ -216,15 +224,16 @@ export default function LoginScreen({ navigation }) {
 
   const onLogin = async () => {
     if (!canSubmit) {
-      if (!isValidPhone) setErr('Enter a 10-digit mobile number.');
+      if (!isValidPhone) setErr('Enter a valid 10-digit mobile number.');
       else if (!password) setErr('Enter your password.');
       return;
     }
     setBusy(true);
     setErr('');
     try {
-      await signIn(phone, password); // authService expects local 10-digit phone
-      navigation.replace('Home');
+
+      await signIn(phone, password); // expects local 10-digit phone + password
+      // navigation.replace('Home');
     } catch (e) {
       const map = {
         'invalid-10-digit': 'Enter a valid 10-digit mobile number.',
@@ -244,88 +253,134 @@ export default function LoginScreen({ navigation }) {
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      style={s.wrap}
+      style={styles.wrap}
     >
-      <Text style={s.h1}>Welcome back 👋</Text>
-
-      {/* Mobile (10 digits) */}
-      <TextInput
-        placeholder="Mobile Number (10 digits)"
-        placeholderTextColor="#9ca3af"
-        style={[s.input, !isValidPhone && phone.length > 0 && s.inputError]}
-        keyboardType="phone-pad"
-        inputMode="numeric"
-        autoCapitalize="none"
-        autoCorrect={false}
-        value={phone}
-        onChangeText={onChangePhone}
-        maxLength={10}
-      />
-      {!isValidPhone && phone.length > 0 ? (
-        <Text style={s.helper}>Enter a 10-digit mobile number.</Text>
-      ) : null}
-
-      {/* Password + eye toggle */}
-      <View style={s.passwordContainer}>
-        <TextInput
-          placeholder="Password"
-          placeholderTextColor="#9ca3af"
-          style={s.passwordInput}
-          secureTextEntry={!showPassword}
-          value={password}
-          onChangeText={(v) => { setPassword(v); setErr(''); }}
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
-        <TouchableOpacity onPress={() => setShowPassword(v => !v)} style={s.eyeButton}>
-          <Icon name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={22} color="#6b7280" />
-        </TouchableOpacity>
-      </View>
-
-      {!!err && <Text style={s.errorText}>{err}</Text>}
-
-      <TouchableOpacity
-        style={[s.btn, !canSubmit && { opacity: 0.6 }]}
-        onPress={onLogin}
-        disabled={!canSubmit}
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        keyboardShouldPersistTaps="handled"
       >
-        <Text style={s.btnText}>{busy ? 'Signing in…' : 'Sign in'}</Text>
-      </TouchableOpacity>
+        <View style={styles.header}>
+          <Text style={styles.h1}>Welcome back</Text>
+          <Text style={styles.sub}>Sign in to continue learning</Text>
+        </View>
 
-      <TouchableOpacity onPress={goSignup}>
-        <Text style={s.link}>Create account</Text>
-      </TouchableOpacity>
+        <View style={styles.card}>
+          {/* Phone */}
+          <View
+            style={[
+              styles.inputRow,
+              !isValidPhone && phone.length > 0 && styles.inputError,
+            ]}
+          >
+            <Icon name="phone-outline" size={20} color="#6b7280" style={styles.leftIcon} />
+            <TextInput
+              placeholder="Mobile Number (10 digits)"
+              placeholderTextColor="#9ca3af"
+              style={styles.inputField}
+              keyboardType="phone-pad"
+              inputMode="numeric"
+              autoCapitalize="none"
+              autoCorrect={false}
+              value={phone}
+              onChangeText={onChangePhone}
+              maxLength={10}
+              returnKeyType="next"
+            />
+          </View>
+          {!isValidPhone && phone.length > 0 ? (
+            <Text style={styles.helper}>Enter a 10-digit mobile number.</Text>
+          ) : null}
+
+          {/* Password */}
+          <View style={[styles.inputRow, !password && styles.inputBase]}>
+            <Icon name="lock-outline" size={20} color="#6b7280" style={styles.leftIcon} />
+            <TextInput
+              placeholder="Password"
+              placeholderTextColor="#9ca3af"
+              style={styles.inputField}
+              secureTextEntry={!showPassword}
+              value={password}
+              onChangeText={(v) => { setPassword(v); setErr(''); }}
+              autoCapitalize="none"
+              autoCorrect={false}
+              returnKeyType="done"
+              onSubmitEditing={onLogin}
+            />
+            <TouchableOpacity onPress={() => setShowPassword(v => !v)} style={styles.eyeButton}>
+              <Icon
+                name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                size={20}
+                color="#6b7280"
+              />
+            </TouchableOpacity>
+          </View>
+
+          {!!err && (
+            <View style={styles.errorBox}>
+              <Icon name="alert-circle-outline" size={18} color="#ef4444" />
+              <Text style={styles.errorText}>{err}</Text>
+            </View>
+          )}
+
+          <TouchableOpacity
+            style={[styles.btn, !canSubmit && { opacity: 0.6 }]}
+            onPress={onLogin}
+            disabled={!canSubmit}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.btnText}>{busy ? 'Signing in…' : 'Sign in'}</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* <TouchableOpacity onPress={goSignup}>
+          <Text style={styles.link}>Create account</Text>
+        </TouchableOpacity> */}
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
-const s = StyleSheet.create({
+const styles = StyleSheet.create({
   wrap: {
     flex: 1,
     backgroundColor: '#f4f7fb',
+  },
+  scroll: {
     padding: 20,
+    paddingBottom: 32,
     justifyContent: 'center',
+    flexGrow: 1,
+  },
+  header: {
+    marginBottom: 12,
+    alignItems: 'center',
   },
   h1: {
     fontSize: 24,
     fontWeight: '800',
-    marginBottom: 20,
     color: '#111827',
   },
-  input: {
+  sub: {
+    marginTop: 4,
+    color: '#6b7280',
+    fontSize: 14,
+  },
+
+  card: {
     backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 14,
-    marginVertical: 8,
+    borderRadius: 16,
+    padding: 16,
     borderWidth: 1,
     borderColor: '#e5e7eb',
-    color: '#111827',
-    fontSize: 16,
+    // subtle shadow
+    shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
   },
-  inputError: { borderColor: '#ef4444' },
-  helper: { color: '#ef4444', fontSize: 12, marginTop: -4, marginBottom: 6 },
 
-  passwordContainer: {
+  inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#fff',
@@ -333,27 +388,42 @@ const s = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e5e7eb',
     marginVertical: 8,
+    paddingHorizontal: 10,
   },
-  passwordInput: {
+  inputBase: { borderColor: '#e5e7eb' },
+  leftIcon: { marginRight: 6 },
+  inputField: {
     flex: 1,
-    padding: 14,
+    paddingVertical: 12,
     fontSize: 16,
     color: '#111827',
   },
-  eyeButton: {
-    paddingHorizontal: 12,
-  },
+  eyeButton: { paddingHorizontal: 8, paddingVertical: 10 },
 
-  errorText: { color: '#ef4444', marginTop: 6 },
+  inputError: { borderColor: '#ef4444' },
+  helper: { color: '#ef4444', fontSize: 12, marginTop: -2, marginBottom: 6 },
+
+  errorBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#fee2e2',
+    borderColor: '#fecaca',
+    borderWidth: 1,
+    padding: 10,
+    borderRadius: 10,
+    marginTop: 6,
+  },
+  errorText: { color: '#b91c1c', flex: 1 },
 
   btn: {
     backgroundColor: THEME,
-    padding: 14,
+    paddingVertical: 14,
     borderRadius: 12,
-    marginTop: 10,
+    marginTop: 12,
     alignItems: 'center',
   },
-  btnText: { color: '#fff', fontWeight: '700' },
+  btnText: { color: '#fff', fontWeight: '700', fontSize: 16 },
 
   link: {
     marginTop: 16,

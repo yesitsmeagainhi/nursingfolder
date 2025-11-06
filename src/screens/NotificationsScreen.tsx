@@ -383,126 +383,276 @@
 //     title: { fontSize: 16, fontWeight: '700', color: '#0f172a', flex: 1 },
 //     body: { color: '#374151', marginBottom: 6 },
 //     time: { fontSize: 12, color: '#6b7280' },
+// // });
+// // src/screens/NotificationsScreen.tsx
+// import React, {
+//     useEffect, useState, useCallback, useRef, useLayoutEffect
+// } from 'react';
+// import {
+//     View, Text, FlatList, RefreshControl, TouchableOpacity, StyleSheet, Dimensions
+// } from 'react-native';
+// import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+// import { useFocusEffect } from '@react-navigation/native';
+// import firestore from '@react-native-firebase/firestore';
+// import AsyncStorage from '@react-native-async-storage/async-storage';
+// import notifee, { AndroidImportance } from '@notifee/react-native';
+
+// import { getNotifications, clearNotifications } from '../utils/notificationsStorage';
+// import { ensureDefaultChannel } from '../utils/notifyInit';
+
+// // --- helpers (unchanged) ---
+// const SEEN_KEY = 'announcements_seen_v1';
+// async function getSeenIds() { try { const s = await AsyncStorage.getItem(SEEN_KEY); return s ? JSON.parse(s) : {}; } catch { return {}; } }
+// async function setSeenIds(map: any) { try { await AsyncStorage.setItem(SEEN_KEY, JSON.stringify(map)); } catch { } }
+// function formatWhen(when: any) { try { if (when && typeof when === 'object') { if (typeof when.toDate === 'function') return when.toDate().toLocaleString(); if (Number.isFinite(when.seconds)) return new Date(when.seconds * 1000).toLocaleString(); } if (Number.isFinite(when)) return new Date(when).toLocaleString(); const d = new Date(when); if (!isNaN(d.getTime())) return d.toLocaleString(); } catch { } return ''; }
+// function makeKey(n: any) { if (n.__origin === 'announcement' && n.id) return n.id; const parts = [n.id, n?.data?.id, n?.title, n.__origin].filter(Boolean); return parts.join('|') || Math.random().toString(36).slice(2); }
+// function normalizeNotification(n: any) { const title = n?.title || n?.data?.title || 'Notification'; const body = n?.body || n?.data?.body || ''; const when = n?.receivedAt ?? n?.createdAt ?? n?.time; return { ...n, title, body, receivedAt: when, __origin: n.__origin || 'local', __key: makeKey(n) }; }
+// function announcementToNotif(doc: any) { const d = doc.data() || {}; const title = d.title || 'Announcement'; const body = d.body || ''; const createdAt = d.createdAt || Date.now(); const data = { ...(d.data || {}), title, type: 'announcement' }; return normalizeNotification({ id: doc.id, title, body, receivedAt: createdAt, data, __origin: 'announcement' }); }
+
+// export default function NotificationsScreen({ navigation }: any) {
+//     const [localItems, setLocalItems] = useState<any[]>([]);
+//     const [announcements, setAnnouncements] = useState<any[]>([]);
+//     const [refreshing, setRefreshing] = useState(false);
+//     const annUnsubRef = useRef<null | (() => void)>(null);
+
+//     const { width } = Dimensions.get('window');
+//     const scale = Math.min(Math.max(width / 390, 0.9), 1.12);
+
+//     // ---- Local first (define BEFORE onClear) ----
+//     const loadLocal = useCallback(async () => {
+//         const list = await getNotifications();
+//         const normalized = (Array.isArray(list) ? list : []).map((n) =>
+//             normalizeNotification({ ...n, __origin: 'local' })
+//         );
+//         setLocalItems(normalized);
+//     }, []);
+
+//     // Header button callback (depends on loadLocal)
+//     const onClear = useCallback(async () => {
+//         await clearNotifications();
+//         await loadLocal();
+//     }, [loadLocal]);
+
+//     // Merge lists
+//     const mergedItems = [...announcements, ...localItems].sort((a, b) => {
+//         const ta = a.receivedAt?.seconds ? a.receivedAt.seconds * 1000 : new Date(a.receivedAt || 0).getTime();
+//         const tb = b.receivedAt?.seconds ? b.receivedAt.seconds * 1000 : new Date(b.receivedAt || 0).getTime();
+//         return tb - ta;
+//     });
+
+//     // Live announcements
+//     const startAnnouncementsListener = useCallback(() => {
+//         const q = firestore().collection('announcements').where('published', '==', true).limit(100);
+//         let known: Record<string, 1> = {};
+//         const unsub = q.onSnapshot(async (snap) => {
+//             const anns = snap.docs.map(announcementToNotif);
+//             await ensureDefaultChannel();
+//             const seen = await getSeenIds();
+
+//             for (const change of snap.docChanges()) {
+//                 const id = change.doc.id;
+//                 const data = change.doc.data() || {};
+//                 const isAdded = change.type === 'added';
+//                 const isModified = change.type === 'modified';
+
+//                 if ((isAdded || isModified) && data.published === true) {
+//                     if (!seen[id] && !known[id]) {
+//                         await notifee.displayNotification({
+//                             title: data.title || 'Announcement',
+//                             body: data.body || '',
+//                             android: {
+//                                 channelId: 'default',
+//                                 smallIcon: 'ic_launcher',
+//                                 importance: AndroidImportance.HIGH,
+//                                 pressAction: { id: 'open-notifications' },
+//                             },
+//                             data: { nav: 'Notifications' },
+//                         });
+//                         seen[id] = 1; known[id] = 1;
+//                     }
+//                 }
+//             }
+//             await setSeenIds(seen);
+
+//             anns.sort((a, b) => {
+//                 const ta = a.receivedAt?.seconds ? a.receivedAt.seconds * 1000 : new Date(a.receivedAt || 0).getTime();
+//                 const tb = b.receivedAt?.seconds ? b.receivedAt.seconds * 1000 : new Date(b.receivedAt || 0).getTime();
+//                 return tb - ta;
+//             });
+//             setAnnouncements(anns);
+//         });
+//         return unsub;
+//     }, []);
+
+//     // Mount
+//     useEffect(() => {
+//         loadLocal();
+//         const unsub = startAnnouncementsListener();
+//         annUnsubRef.current = unsub;
+//         return () => { try { annUnsubRef.current && annUnsubRef.current(); } catch { } };
+//     }, [loadLocal, startAnnouncementsListener]);
+
+//     // Pull to refresh
+//     const onRefresh = async () => {
+//         setRefreshing(true);
+//         await loadLocal();
+//         setRefreshing(false);
+//     };
+
+//     // Refocus refresh
+//     useFocusEffect(useCallback(() => { loadLocal(); }, [loadLocal]));
+
+//     // Put clear button in header
+//     useLayoutEffect(() => {
+//         navigation.setOptions({
+//             headerRight: () => (
+//                 <TouchableOpacity onPress={onClear} style={{ paddingHorizontal: 12 }}>
+//                     <Icon name="delete-outline" size={22} color="#fff" />
+//                 </TouchableOpacity>
+//             ),
+//         });
+//     }, [navigation, onClear]);
+
+//     // Tap handler (unchanged)
+//     const handleOpen = (item: any) => {
+//         if (item.__origin === 'announcement') return;
+//         const type = (item?.data?.type || item?.data?.screen || '').toLowerCase();
+//         const title = item?.data?.title || item.title || 'Video';
+//         const nodeId = item?.data?.nodeId;
+//         const url = item?.data?.url || '';
+//         const embed = item?.data?.embedUrl || item?.data?.videoUrl || '';
+//         const path = item?.data?.path;
+//         const courseId = item?.data?.courseId;
+//         const bestUrl = url || embed;
+//         const isPdf = (bestUrl || '').toLowerCase().endsWith('.pdf');
+
+//         if (type === 'video' || type === 'videoplayer') {
+//             if (bestUrl) navigation.navigate('Viewer', { title, type: 'video', url: bestUrl, embedUrl: embed || undefined, nodeId });
+//             else if (nodeId) navigation.navigate('Viewer', { title, type: 'video', nodeId });
+//             else navigation.navigate('Home');
+//             return;
+//         }
+//         if (type === 'pdf' || isPdf) { navigation.navigate('Viewer', { title, type: 'pdf', url: bestUrl || url, nodeId }); return; }
+//         if (type === 'folder' || type === 'explorer') {
+//             if (nodeId) navigation.navigate('Explorer', { openFolderId: nodeId, openFolderName: title });
+//             else navigation.navigate('Explorer', { path, courseId });
+//             return;
+//         }
+//         navigation.navigate('Home');
+//     };
+
+//     const renderItem = ({ item }: any) => (
+//         <TouchableOpacity
+//             style={[styles.card, { padding: 14 * scale }]}
+//             activeOpacity={item.__origin === 'announcement' ? 1 : 0.8}
+//             onPress={() => handleOpen(item)}
+//         >
+//             <View style={styles.row}>
+//                 <Icon
+//                     name={item.__origin === 'announcement' ? 'bullhorn' : 'bell-ring'}
+//                     size={22 * scale}
+//                     color={item.__origin === 'announcement' ? '#b91c1c' : '#166534'}
+//                 />
+//                 <Text style={[styles.title, { fontSize: 16 * scale }]} numberOfLines={1}>{item.title}</Text>
+//             </View>
+//             {!!item.body && <Text style={[styles.body, { fontSize: 14 * scale }]} numberOfLines={2}>{item.body}</Text>}
+//             <Text style={[styles.time, { fontSize: 12 * scale }]}>{formatWhen(item.receivedAt)}</Text>
+//         </TouchableOpacity>
+//     );
+
+//     return (
+//         <View style={styles.container}>
+//             {/* no custom header here; we use native headerRight */}
+//             <FlatList
+//                 data={mergedItems}
+//                 keyExtractor={(it: any) => it.__key}
+//                 renderItem={renderItem}
+//                 contentContainerStyle={{ padding: 16 }}
+//                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+//                 ListEmptyComponent={
+//                     <View style={{ padding: 24, alignItems: 'center' }}>
+//                         <Icon name="bell-off" size={28 * scale} color="#9ca3af" />
+//                         <Text style={{ marginTop: 8, color: '#6b7280', fontSize: 14 * scale }}>No notifications yet</Text>
+//                     </View>
+//                 }
+//             />
+//         </View>
+//     );
+// }
+
+// const styles = StyleSheet.create({
+//     container: { flex: 1, backgroundColor: '#f8fafc' },
+//     card: { backgroundColor: '#fff', borderRadius: 14, padding: 14, borderWidth: 1, borderColor: '#e5e7eb', marginBottom: 12 },
+//     row: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
+//     title: { fontWeight: '700', color: '#0f172a', flex: 1 },
+//     body: { color: '#374151', marginBottom: 6 },
+//     time: { color: '#6b7280' },
 // });
 // src/screens/NotificationsScreen.tsx
-import React, {
-    useEffect, useState, useCallback, useRef, useLayoutEffect
-} from 'react';
+import React, { useEffect, useState, useCallback, useLayoutEffect } from 'react';
 import {
     View, Text, FlatList, RefreshControl, TouchableOpacity, StyleSheet, Dimensions
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useFocusEffect } from '@react-navigation/native';
-import firestore from '@react-native-firebase/firestore';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import notifee, { AndroidImportance } from '@notifee/react-native';
 
 import { getNotifications, clearNotifications } from '../utils/notificationsStorage';
-import { ensureDefaultChannel } from '../utils/notifyInit';
 
-// --- helpers (unchanged) ---
-const SEEN_KEY = 'announcements_seen_v1';
-async function getSeenIds() { try { const s = await AsyncStorage.getItem(SEEN_KEY); return s ? JSON.parse(s) : {}; } catch { return {}; } }
-async function setSeenIds(map: any) { try { await AsyncStorage.setItem(SEEN_KEY, JSON.stringify(map)); } catch { } }
-function formatWhen(when: any) { try { if (when && typeof when === 'object') { if (typeof when.toDate === 'function') return when.toDate().toLocaleString(); if (Number.isFinite(when.seconds)) return new Date(when.seconds * 1000).toLocaleString(); } if (Number.isFinite(when)) return new Date(when).toLocaleString(); const d = new Date(when); if (!isNaN(d.getTime())) return d.toLocaleString(); } catch { } return ''; }
-function makeKey(n: any) { if (n.__origin === 'announcement' && n.id) return n.id; const parts = [n.id, n?.data?.id, n?.title, n.__origin].filter(Boolean); return parts.join('|') || Math.random().toString(36).slice(2); }
-function normalizeNotification(n: any) { const title = n?.title || n?.data?.title || 'Notification'; const body = n?.body || n?.data?.body || ''; const when = n?.receivedAt ?? n?.createdAt ?? n?.time; return { ...n, title, body, receivedAt: when, __origin: n.__origin || 'local', __key: makeKey(n) }; }
-function announcementToNotif(doc: any) { const d = doc.data() || {}; const title = d.title || 'Announcement'; const body = d.body || ''; const createdAt = d.createdAt || Date.now(); const data = { ...(d.data || {}), title, type: 'announcement' }; return normalizeNotification({ id: doc.id, title, body, receivedAt: createdAt, data, __origin: 'announcement' }); }
+// --- helpers ---
+function formatWhen(when: any) {
+    try {
+        if (when && typeof when === 'object') {
+            if (typeof when.toDate === 'function') return when.toDate().toLocaleString();
+            if (Number.isFinite(when.seconds)) return new Date(when.seconds * 1000).toLocaleString();
+        }
+        if (Number.isFinite(when)) return new Date(when).toLocaleString();
+        const d = new Date(when);
+        if (!isNaN(d.getTime())) return d.toLocaleString();
+    } catch { }
+    return '';
+}
+
+function makeKey(n: any) {
+    const parts = [n.id, n?.data?.id, n?.title, n.__origin].filter(Boolean);
+    return parts.join('|') || Math.random().toString(36).slice(2);
+}
+
+function normalizeNotification(n: any) {
+    const title = n?.title || n?.data?.title || 'Notification';
+    const body = n?.body || n?.data?.body || '';
+    const when = n?.receivedAt ?? n?.createdAt ?? n?.time ?? Date.now();
+    return { ...n, title, body, receivedAt: when, __origin: n.__origin || 'push', __key: makeKey(n) };
+}
 
 export default function NotificationsScreen({ navigation }: any) {
-    const [localItems, setLocalItems] = useState<any[]>([]);
-    const [announcements, setAnnouncements] = useState<any[]>([]);
+    const [items, setItems] = useState<any[]>([]);
     const [refreshing, setRefreshing] = useState(false);
-    const annUnsubRef = useRef<null | (() => void)>(null);
 
     const { width } = Dimensions.get('window');
     const scale = Math.min(Math.max(width / 390, 0.9), 1.12);
 
-    // ---- Local first (define BEFORE onClear) ----
-    const loadLocal = useCallback(async () => {
+    // Load everything the app stored from FCM (foreground + background)
+    const loadInbox = useCallback(async () => {
         const list = await getNotifications();
-        const normalized = (Array.isArray(list) ? list : []).map((n) =>
-            normalizeNotification({ ...n, __origin: 'local' })
-        );
-        setLocalItems(normalized);
+        const normalized = (Array.isArray(list) ? list : []).map(normalizeNotification);
+        normalized.sort((a, b) => {
+            const ta = a.receivedAt?.seconds ? a.receivedAt.seconds * 1000 : new Date(a.receivedAt || 0).getTime();
+            const tb = b.receivedAt?.seconds ? b.receivedAt.seconds * 1000 : new Date(b.receivedAt || 0).getTime();
+            return tb - ta;
+        });
+        setItems(normalized);
     }, []);
 
-    // Header button callback (depends on loadLocal)
+    // initial + refocus
+    useEffect(() => { loadInbox(); }, [loadInbox]);
+    useFocusEffect(useCallback(() => { loadInbox(); }, [loadInbox]));
+
+    // Clear button in header
     const onClear = useCallback(async () => {
         await clearNotifications();
-        await loadLocal();
-    }, [loadLocal]);
+        await loadInbox();
+    }, [loadInbox]);
 
-    // Merge lists
-    const mergedItems = [...announcements, ...localItems].sort((a, b) => {
-        const ta = a.receivedAt?.seconds ? a.receivedAt.seconds * 1000 : new Date(a.receivedAt || 0).getTime();
-        const tb = b.receivedAt?.seconds ? b.receivedAt.seconds * 1000 : new Date(b.receivedAt || 0).getTime();
-        return tb - ta;
-    });
-
-    // Live announcements
-    const startAnnouncementsListener = useCallback(() => {
-        const q = firestore().collection('announcements').where('published', '==', true).limit(100);
-        let known: Record<string, 1> = {};
-        const unsub = q.onSnapshot(async (snap) => {
-            const anns = snap.docs.map(announcementToNotif);
-            await ensureDefaultChannel();
-            const seen = await getSeenIds();
-
-            for (const change of snap.docChanges()) {
-                const id = change.doc.id;
-                const data = change.doc.data() || {};
-                const isAdded = change.type === 'added';
-                const isModified = change.type === 'modified';
-
-                if ((isAdded || isModified) && data.published === true) {
-                    if (!seen[id] && !known[id]) {
-                        await notifee.displayNotification({
-                            title: data.title || 'Announcement',
-                            body: data.body || '',
-                            android: {
-                                channelId: 'default',
-                                smallIcon: 'ic_launcher',
-                                importance: AndroidImportance.HIGH,
-                                pressAction: { id: 'open-notifications' },
-                            },
-                            data: { nav: 'Notifications' },
-                        });
-                        seen[id] = 1; known[id] = 1;
-                    }
-                }
-            }
-            await setSeenIds(seen);
-
-            anns.sort((a, b) => {
-                const ta = a.receivedAt?.seconds ? a.receivedAt.seconds * 1000 : new Date(a.receivedAt || 0).getTime();
-                const tb = b.receivedAt?.seconds ? b.receivedAt.seconds * 1000 : new Date(b.receivedAt || 0).getTime();
-                return tb - ta;
-            });
-            setAnnouncements(anns);
-        });
-        return unsub;
-    }, []);
-
-    // Mount
-    useEffect(() => {
-        loadLocal();
-        const unsub = startAnnouncementsListener();
-        annUnsubRef.current = unsub;
-        return () => { try { annUnsubRef.current && annUnsubRef.current(); } catch { } };
-    }, [loadLocal, startAnnouncementsListener]);
-
-    // Pull to refresh
-    const onRefresh = async () => {
-        setRefreshing(true);
-        await loadLocal();
-        setRefreshing(false);
-    };
-
-    // Refocus refresh
-    useFocusEffect(useCallback(() => { loadLocal(); }, [loadLocal]));
-
-    // Put clear button in header
     useLayoutEffect(() => {
         navigation.setOptions({
             headerRight: () => (
@@ -513,45 +663,59 @@ export default function NotificationsScreen({ navigation }: any) {
         });
     }, [navigation, onClear]);
 
-    // Tap handler (unchanged)
+    // Open actions (NO embedUrl anywhere)
     const handleOpen = (item: any) => {
-        if (item.__origin === 'announcement') return;
-        const type = (item?.data?.type || item?.data?.screen || '').toLowerCase();
-        const title = item?.data?.title || item.title || 'Video';
-        const nodeId = item?.data?.nodeId;
-        const url = item?.data?.url || '';
-        const embed = item?.data?.embedUrl || item?.data?.videoUrl || '';
-        const path = item?.data?.path;
-        const courseId = item?.data?.courseId;
-        const bestUrl = url || embed;
-        const isPdf = (bestUrl || '').toLowerCase().endsWith('.pdf');
+        const data = item?.data || {};
+        const type = (data.type || data.screen || '').toLowerCase();
+        const title = data.title || item.title || 'Open';
+        const nodeId = data.nodeId;
+        const url = data.url || data.videoUrl || data.pdfUrl || '';
+
+        const isPdf = (url || '').toLowerCase().endsWith('.pdf');
 
         if (type === 'video' || type === 'videoplayer') {
-            if (bestUrl) navigation.navigate('Viewer', { title, type: 'video', url: bestUrl, embedUrl: embed || undefined, nodeId });
+            if (url) navigation.navigate('Viewer', { title, type: 'video', url, nodeId });
             else if (nodeId) navigation.navigate('Viewer', { title, type: 'video', nodeId });
             else navigation.navigate('Home');
             return;
         }
-        if (type === 'pdf' || isPdf) { navigation.navigate('Viewer', { title, type: 'pdf', url: bestUrl || url, nodeId }); return; }
-        if (type === 'folder' || type === 'explorer') {
-            if (nodeId) navigation.navigate('Explorer', { openFolderId: nodeId, openFolderName: title });
-            else navigation.navigate('Explorer', { path, courseId });
+
+        if (type === 'pdf' || isPdf) {
+            navigation.navigate('Viewer', { title, type: 'pdf', url, nodeId });
             return;
         }
+
+        if (type === 'folder' || type === 'explorer') {
+            if (nodeId) navigation.navigate('Explorer', { openFolderId: nodeId, openFolderName: title });
+            else navigation.navigate('Explorer');
+            return;
+        }
+
+        if (type === 'notifications' || type === 'notificationsscreen') {
+            navigation.navigate('Notifications');
+            return;
+        }
+
         navigation.navigate('Home');
+    };
+
+    const onRefresh = async () => {
+        setRefreshing(true);
+        await loadInbox();
+        setRefreshing(false);
     };
 
     const renderItem = ({ item }: any) => (
         <TouchableOpacity
             style={[styles.card, { padding: 14 * scale }]}
-            activeOpacity={item.__origin === 'announcement' ? 1 : 0.8}
+            activeOpacity={0.85}
             onPress={() => handleOpen(item)}
         >
             <View style={styles.row}>
                 <Icon
-                    name={item.__origin === 'announcement' ? 'bullhorn' : 'bell-ring'}
+                    name="bell-ring"
                     size={22 * scale}
-                    color={item.__origin === 'announcement' ? '#b91c1c' : '#166534'}
+                    color="#166534"
                 />
                 <Text style={[styles.title, { fontSize: 16 * scale }]} numberOfLines={1}>{item.title}</Text>
             </View>
@@ -562,9 +726,8 @@ export default function NotificationsScreen({ navigation }: any) {
 
     return (
         <View style={styles.container}>
-            {/* no custom header here; we use native headerRight */}
             <FlatList
-                data={mergedItems}
+                data={items}
                 keyExtractor={(it: any) => it.__key}
                 renderItem={renderItem}
                 contentContainerStyle={{ padding: 16 }}

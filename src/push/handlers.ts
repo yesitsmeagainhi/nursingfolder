@@ -15,7 +15,7 @@ messaging().setBackgroundMessageHandler(async remoteMessage => {
             smallIcon: 'ic_launcher',
             pressAction: { id: 'open-notifications' },
         },
-        data: { nav: 'Notifications', ...remoteMessage.data },
+        data: { nav: 'Notifications', screen: 'notifications', ...(rm?.data || {}) },
     });
 });
 

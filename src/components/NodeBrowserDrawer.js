@@ -344,7 +344,7 @@ function TreeFolder({ node, level, onOpenFile, onOpenFolder }) {
                     activeOpacity={0.7}
                     onPress={() => onOpenFolder?.(node)}
                 >
-                    <Icon name="folder" size={20} color="##195ed2" style={{ marginRight: 6 }} />
+                    <Icon name="folder" size={20} color="#195ed2" style={{ marginRight: 6 }} />
                     <Text style={styles.rowText} numberOfLines={1}>{node.name}</Text>
                 </TouchableOpacity>
             </View>
@@ -484,7 +484,7 @@ export function NodeBrowserDrawer({ visible, onClose, onOpenFile, onOpenFolder, 
 
                     <TouchableOpacity style={styles.quickRow} onPress={() => go('AI')}>
                         <View style={styles.rowLeft}>
-                            <Icon name="robot" size={20} color="##195ed2" />
+                            <Icon name="robot" size={20} color='#195ed2' />
                             <Text style={styles.rowText}>AI coming soon</Text>
                         </View>
                         <Icon name="chevron-right" size={20} color="#9aa3b2" />
@@ -500,7 +500,7 @@ export function NodeBrowserDrawer({ visible, onClose, onOpenFile, onOpenFolder, 
                 </View>
 
                 {loadingRoot ? (
-                    <View style={styles.loader}><ActivityIndicator size="small" color="##195ed2" /></View>
+                    <View style={styles.loader}><ActivityIndicator size="small" color="#195ed2" /></View>
                 ) : (
                     <ScrollView contentContainerStyle={{ paddingBottom: 24 }}>
                         {/* Root folders */}
@@ -535,7 +535,7 @@ export function NodeBrowserDrawer({ visible, onClose, onOpenFile, onOpenFolder, 
                                                 size={20}
                                                 color={file.type === 'video' ? '#ef4444' : '#6b7280'}
                                             />
-                                            <Text style={styles.rowText} numberOfLines={1}>{file.name}</Text>
+                                            <Text style={styles.rowText} numberOfLines={1} color="#195ed2">{file.name}</Text>
                                         </View>
                                     </TouchableOpacity>
                                 ))}

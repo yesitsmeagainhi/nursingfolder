@@ -1,11 +1,19 @@
 // App.tsx
-import React, { useEffect } from 'react';
-import { Platform, StatusBar, PermissionsAndroid, Dimensions } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import {
+  Platform,
+  StatusBar,
+  PermissionsAndroid,
+  Dimensions,
+  View,
+  ActivityIndicator,
+} from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import notifee, { EventType } from '@notifee/react-native';
-import messaging from '@react-native-firebase/messaging';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import notifee, { EventType } from '@notifee/react-native';
+import messaging from '@react-native-firebase/messaging';
+import auth from '@react-native-firebase/auth';
 
 // Screens
 import LoginScreen from './src/screens/LoginScreen';
@@ -19,21 +27,26 @@ import CourseDetailsScreen from './src/screens/CourseDetailsScreen';
 import NotificationsScreen from './src/screens/NotificationsScreen';
 import AIScreen from './src/screens/AIScreen';
 
+// Utils
 import { go, navigationRef } from './src/navigation/navRef';
 import { ensureDefaultChannel } from './src/utils/notifyInit';
 import { addNotification } from './src/utils/notificationsStorage';
 
+const Stack = createNativeStackNavigator();
+
 // ────────────────────────────────────────────────────────────────────────────────
-// Call this ONLY AFTER LOGIN (exported so Login can import & call it)
+// Call this ONLY AFTER LOGIN (or when auth state becomes non-null)
 export async function initNotifications(selectedCourseId?: string) {
   try {
     if (Platform.OS === 'android' && Platform.Version >= 33) {
-      await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS);
+      await PermissionsAndroid.request(
+        PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS
+      );
     }
     await messaging().requestPermission().catch(() => { });
     await ensureDefaultChannel();
 
-    // Subscriptions (topic broadcast). Do this AFTER login so guests don't get them.
+    // Topic subscriptions after sign-in
     await messaging().subscribeToTopic('all');
     if (selectedCourseId) {
       const topic = `course_${String(selectedCourseId).toLowerCase()}`;
@@ -48,10 +61,11 @@ export async function initNotifications(selectedCourseId?: string) {
 }
 // ────────────────────────────────────────────────────────────────────────────────
 
-const Stack = createNativeStackNavigator();
-
 function toItem(remoteMessage: any) {
-  const id = remoteMessage?.data?.id || remoteMessage?.messageId || `${Date.now()}_${Math.random()}`;
+  const id =
+    remoteMessage?.data?.id ||
+    remoteMessage?.messageId ||
+    `${Date.now()}_${Math.random()}`;
   const n = remoteMessage?.notification || {};
   const d = remoteMessage?.data || {};
   const title = n.title || d.title || 'Update';
@@ -62,68 +76,100 @@ function toItem(remoteMessage: any) {
 
 function handleNavigationFromMessage(data?: Record<string, string>) {
   if (!data) return;
-  const screen = (data.screen || data.type || '').toLowerCase();
+
+  // Accept any of these flags from the payload
+  const nav = (data.nav || '').toLowerCase();
+  const screen = (data.screen || data.type || nav).toLowerCase();
   const bestUrl = data.url || data.embedUrl || data.videoUrl;
+
+  // Short-circuit for Notifications
+  if (nav === 'notifications' || screen === 'notifications' || screen === 'notificationsscreen') {
+    go('Notifications');
+    return;
+  }
 
   switch (screen) {
     case 'video':
     case 'videoplayer':
     case 'viewer':
-      go('Viewer', { title: data.title || 'Video', type: 'video', url: bestUrl, embedUrl: data.embedUrl, nodeId: data.nodeId });
-      break;
-    case 'notifications':
-    case 'notificationsscreen':
-      go('Notifications');
-      break;
+      go('Viewer', {
+        title: data.title || 'Video',
+        type: 'video',
+        url: bestUrl,
+        embedUrl: data.embedUrl,
+        nodeId: data.nodeId,
+      });
+      return;
+
     case 'explorer':
       go('Explorer', { title: data.title || 'Explorer', path: data.path });
-      break;
+      return;
+
     case 'contact':
       go('Contact');
-      break;
+      return;
+
     case 'course':
     case 'coursedetails':
       go('CourseDetails', { courseId: data.courseId, title: data.title || 'Course' });
-      break;
+      return;
+
     default:
       go('Home');
   }
 }
 
-function RootNavigator() {
-  const { width } = Dimensions.get('window');
-  const scale = Math.min(Math.max(width / 390, 0.9), 1.12);
 
+function useNotificationHandlers(enabled: boolean) {
   useEffect(() => {
-    // Channel first
-    ensureDefaultChannel();
+    if (!enabled) return;
 
-    // 1) Foreground FCM → show local notification + save to local inbox
-    const unsubscribeOnMessage = messaging().onMessage(async (rm) => {
-      await ensureDefaultChannel();
-      const item = toItem(rm);
-      await addNotification(item);
+    let unsubOnMessage = () => { };
+    let unsubOpened = () => { };
+    let unsubNotifeeFg = () => { };
 
-      await notifee.displayNotification({
-        id: item.id, // stable -> dedupe
-        title: item.title,
-        body: item.body,
-        android: {
-          channelId: 'default',
-          smallIcon: 'ic_launcher',
-          pressAction: { id: 'open-notifications' }, // opens the app
-        },
-        data: { nav: 'Notifications', ...rm.data },
-      });
-    });
-
-    // 2) User tapped system notification while app is in background
-    const unsubscribeOpened = messaging().onNotificationOpenedApp((rm) => {
-      if (rm?.data) handleNavigationFromMessage(rm.data);
-    });
-
-    // 3) App was cold-started by tapping a notification
     (async () => {
+      await ensureDefaultChannel();
+
+      // 1) Foreground FCM → local notif + save to inbox
+      unsubOnMessage = messaging().onMessage(async (rm) => {
+        await ensureDefaultChannel();
+        const item = toItem(rm);
+        await addNotification(item);
+
+        await notifee.displayNotification({
+          id: item.id,
+          title: item.title,
+          body: item.body,
+          android: {
+            channelId: 'default',
+            smallIcon: 'ic_launcher',
+            pressAction: { id: 'open-notifications' },
+          },
+          "data": {
+            "nav": "Notifications",
+            "screen": "notifications",
+            "type": "notifications",
+            "title": "New video uploaded"
+          }
+        });
+      });
+
+      // 2) App in background → user taps notification
+      // Background → user taps a push
+      unsubOpened = messaging().onNotificationOpenedApp((rm) => {
+        const d = rm?.data;
+        if (!d) return;
+
+        if ((d.nav || '').toLowerCase() === 'notifications') {
+          go('Notifications');
+        } else {
+          handleNavigationFromMessage(d);
+        }
+      });
+
+
+      // 3) Cold start via notification
       const initialFCM = await messaging().getInitialNotification();
       if (initialFCM?.data) handleNavigationFromMessage(initialFCM.data);
 
@@ -133,62 +179,125 @@ function RootNavigator() {
         if (localData.nav === 'Notifications') go('Notifications');
         else handleNavigationFromMessage(localData);
       }
+
+      // 4) Foreground Notifee taps
+      unsubNotifeeFg = notifee.onForegroundEvent(({ type, detail }) => {
+        if (type === EventType.PRESS) {
+          const data = detail.notification?.data as any;
+          if (data?.nav === 'Notifications') go('Notifications');
+          else handleNavigationFromMessage(data);
+        }
+      });
     })();
 
-    // 4) Taps on notifications while app is foregrounded
-    const unsubscribeNotifeeFg = notifee.onForegroundEvent(({ type, detail }) => {
-      if (type === EventType.PRESS) {
-        const data = detail.notification?.data as any;
-        if (data?.nav === 'Notifications') go('Notifications');
-        else handleNavigationFromMessage(data);
-      }
-    });
-
     return () => {
-      unsubscribeOnMessage();
-      unsubscribeOpened();
-      unsubscribeNotifeeFg();
+      try { unsubOnMessage(); } catch { }
+      try { unsubOpened(); } catch { }
+      try { unsubNotifeeFg(); } catch { }
     };
-  }, []);
+  }, [enabled]);
+}
+
+function AppNavigator() {
+  const { width } = Dimensions.get('window');
+  const scale = Math.min(Math.max(width / 390, 0.9), 1.12);
 
   return (
-    <>
-      <StatusBar backgroundColor="#195ed2" barStyle="light-content" translucent={false} />
-      <NavigationContainer ref={navigationRef}>
-        <Stack.Navigator
-          screenOptions={{
-            headerStyle: { backgroundColor: '#195ed2' },
-            headerTintColor: '#fff',
-            headerTitleStyle: { fontWeight: '700', fontSize: Math.round(18 * scale) },
-            headerTitleAlign: 'left',
-            headerShadowVisible: false,
-            headerTopInsetEnabled: true,
-            statusBarColor: '#195ed2',
-            statusBarStyle: 'light',
-            statusBarTranslucent: false,
-            contentStyle: { backgroundColor: '#fff' },
-          }}
-        >
-          <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
-          <Stack.Screen name="Signup" component={SignupScreen} options={{ title: 'Create Account' }} />
-          <Stack.Screen name="Home" component={HomeScreen} options={{ headerShown: false }} />
-          <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ title: 'Notifications' }} />
-          <Stack.Screen name="Contact" component={ContactScreen} options={{ title: 'Contact Us' }} />
-          <Stack.Screen name="AI" component={AIScreen} options={{ title: 'AI Assistant' }} />
-          <Stack.Screen name="Explorer" component={ExplorerScreen} options={({ route }) => ({ title: (route as any).params?.title || 'Explorer' })} />
-          <Stack.Screen name="Viewer" component={ViewerScreen} options={({ route }) => ({ title: (route as any).params?.title || 'Viewer' })} />
-          <Stack.Screen name="VideoPlayer" component={VideoPlayerScreen} options={{ title: 'Video' }} />
-          <Stack.Screen name="CourseDetails" component={CourseDetailsScreen} options={{ title: 'Course' }} />
-        </Stack.Navigator>
-      </NavigationContainer>
-    </>
+    <Stack.Navigator
+      screenOptions={{
+        headerStyle: { backgroundColor: '#195ed2' },
+        headerTintColor: '#fff',
+        headerTitleStyle: { fontWeight: '700', fontSize: Math.round(18 * scale) },
+        headerTitleAlign: 'left',
+        headerShadowVisible: false,
+        headerTopInsetEnabled: true,
+        statusBarColor: '#195ed2',
+        statusBarStyle: 'light',
+        statusBarTranslucent: false,
+        contentStyle: { backgroundColor: '#fff' },
+      }}
+    >
+      <Stack.Screen name="Home" component={HomeScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ title: 'Notifications' }} />
+      <Stack.Screen name="Contact" component={ContactScreen} options={{ title: 'Contact Us' }} />
+      <Stack.Screen name="AI" component={AIScreen} options={{ title: 'AI Assistant' }} />
+      <Stack.Screen
+        name="Explorer"
+        component={ExplorerScreen}
+        options={({ route }) => ({
+          title: (route as any).params?.title || 'Explorer',
+        })}
+      />
+      <Stack.Screen
+        name="Viewer"
+        component={ViewerScreen}
+        options={({ route }) => ({
+          title: (route as any).params?.title || 'Viewer',
+        })}
+      />
+      <Stack.Screen name="VideoPlayer" component={VideoPlayerScreen} options={{ title: 'Video' }} />
+      <Stack.Screen name="CourseDetails" component={CourseDetailsScreen} options={{ title: 'Course' }} />
+    </Stack.Navigator>
+  );
+}
+
+function AuthNavigator() {
+  const { width } = Dimensions.get('window');
+  const scale = Math.min(Math.max(width / 390, 0.9), 1.12);
+
+  return (
+    <Stack.Navigator
+      screenOptions={{
+        headerStyle: { backgroundColor: '#195ed2' },
+        headerTintColor: '#fff',
+        headerTitleStyle: { fontWeight: '700', fontSize: Math.round(18 * scale) },
+        headerTitleAlign: 'left',
+        headerShadowVisible: false,
+        contentStyle: { backgroundColor: '#fff' },
+      }}
+    >
+      <Stack.Screen name="Login" component={LoginScreen} options={{ title: 'Sign in' }} />
+      <Stack.Screen name="Signup" component={SignupScreen} options={{ title: 'Create Account' }} />
+    </Stack.Navigator>
   );
 }
 
 export default function App() {
+  const [ready, setReady] = useState(false);
+  const [user, setUser] = useState<null | { uid: string }>(null);
+
+  // Auth gate — restores session after force-close (long-lived refresh token)
+  useEffect(() => {
+    const unsub = auth().onAuthStateChanged(async (u) => {
+      setUser(u ? { uid: u.uid } : null);
+      setReady(true);
+
+      if (u) {
+        try {
+          await initNotifications(); // optional: subscribe topics, get token
+        } catch { }
+      }
+    });
+    return unsub;
+  }, []);
+
+  // Notification handlers only when app UI is up
+  useNotificationHandlers(ready);
+
+  if (!ready) {
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff' }}>
+        <ActivityIndicator size="large" />
+      </View>
+    );
+  }
+
   return (
     <SafeAreaProvider>
-      <RootNavigator />
+      <StatusBar backgroundColor="#195ed2" barStyle="light-content" />
+      <NavigationContainer ref={navigationRef}>
+        {user ? <AppNavigator /> : <AuthNavigator />}
+      </NavigationContainer>
     </SafeAreaProvider>
   );
 }
