@@ -1,53 +1,323 @@
+// // src/screens/SignupScreen.js
+// import React, { useMemo, useState } from 'react';
+// import {
+//   View,
+//   Text,
+//   TextInput,
+//   TouchableOpacity,
+//   StyleSheet,
+//   KeyboardAvoidingView,
+//   Platform,
+//   StatusBar,
+//   ScrollView,
+// } from 'react-native';
+// import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+// import { signUp } from '../services/authService';
+// import { THEME } from '../utils/map';
+
+// export default function SignupScreen({ navigation }) {
+//   const [phone, setPhone] = useState('');
+//   const [password, setPassword] = useState('');
+//   const [showPassword, setShowPassword] = useState(false);
+//   const [busy, setBusy] = useState(false);
+//   const [err, setErr] = useState('');
+
+//   const onChangePhone = (v) => {
+//     const digits = (v || '').replace(/\D/g, '').slice(0, 10);
+//     setPhone(digits);
+//     setErr('');
+//   };
+
+//   const isValidPhone = useMemo(() => /^\d{10}$/.test(phone), [phone]);
+//   const isValidPassword = useMemo(() => (password || '').length >= 6, [password]);
+//   const canSubmit = isValidPhone && isValidPassword && !busy;
+
+//   const onSignup = async () => {
+//     if (!canSubmit) {
+//       if (!isValidPhone) setErr('Enter a valid 10-digit mobile number.');
+//       else if (!isValidPassword) setErr('Password must be at least 6 characters.');
+//       return;
+//     }
+//     setBusy(true);
+//     setErr('');
+//     try {
+//       await signUp(phone, password); // expects (local10, password)
+//       navigation.replace('Home');
+//     } catch (e) {
+//       const map = {
+//         'invalid-10-digit': 'Enter a valid 10-digit mobile number.',
+//         'auth/weak-password': 'Password must be at least 6 characters.',
+//         'auth/email-already-in-use': 'This mobile is already registered. Try signing in.',
+//         'auth/operation-not-allowed': 'Email/Password sign-up is disabled in Firebase.',
+//         'auth/network-request-failed': 'Network error. Check your connection.',
+//       };
+//       setErr(map[e?.code] || 'Signup failed. Please try again.');
+//       console.warn('Signup error:', e);
+//     } finally {
+//       setBusy(false);
+//     }
+//   };
+
+//   return (
+//     <KeyboardAvoidingView
+//       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+//       style={styles.wrap}
+//     >
+//       <StatusBar backgroundColor={THEME} barStyle="light-content" />
+
+//       <ScrollView
+//         contentContainerStyle={styles.scroll}
+//         keyboardShouldPersistTaps="handled"
+//       >
+//         <View style={styles.header}>
+//           <Text style={styles.h1}>Create your account</Text>
+//           <Text style={styles.sub}>Start learning faster with ABS</Text>
+//         </View>
+
+//         <View style={styles.card}>
+//           {/* Phone */}
+//           <View
+//             style={[
+//               styles.inputRow,
+//               !isValidPhone && phone.length > 0 && styles.inputError,
+//             ]}
+//           >
+//             <Icon name="phone-outline" size={20} color="#6b7280" style={styles.leftIcon} />
+//             <TextInput
+//               placeholder="Mobile Number (10 digits)"
+//               placeholderTextColor="#9ca3af"
+//               style={styles.inputField}
+//               keyboardType="phone-pad"
+//               inputMode="numeric"
+//               autoCapitalize="none"
+//               autoCorrect={false}
+//               value={phone}
+//               onChangeText={onChangePhone}
+//               maxLength={10}
+//               returnKeyType="next"
+//             />
+//           </View>
+//           {!isValidPhone && phone.length > 0 ? (
+//             <Text style={styles.helper}>Enter a 10-digit mobile number.</Text>
+//           ) : null}
+
+//           {/* Password */}
+//           <View
+//             style={[
+//               styles.inputRow,
+//               !isValidPassword && password.length > 0 && styles.inputError,
+//             ]}
+//           >
+//             <Icon name="lock-outline" size={20} color="#6b7280" style={styles.leftIcon} />
+//             <TextInput
+//               placeholder="Password (min 6 characters)"
+//               placeholderTextColor="#9ca3af"
+//               style={styles.inputField}
+//               secureTextEntry={!showPassword}
+//               value={password}
+//               onChangeText={(v) => { setPassword(v); setErr(''); }}
+//               autoCapitalize="none"
+//               autoCorrect={false}
+//               returnKeyType="done"
+//             />
+//             <TouchableOpacity onPress={() => setShowPassword(v => !v)} style={styles.eyeButton}>
+//               <Icon
+//                 name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+//                 size={20}
+//                 color="#6b7280"
+//               />
+//             </TouchableOpacity>
+//           </View>
+//           {!isValidPassword && password.length > 0 ? (
+//             <Text style={styles.helper}>Password must be at least 6 characters.</Text>
+//           ) : null}
+
+//           {!!err && (
+//             <View style={styles.errorBox}>
+//               <Icon name="alert-circle-outline" size={18} color="#ef4444" />
+//               <Text style={styles.errorText}>{err}</Text>
+//             </View>
+//           )}
+
+//           <TouchableOpacity
+//             style={[styles.btn, !canSubmit && { opacity: 0.6 }]}
+//             onPress={onSignup}
+//             disabled={!canSubmit}
+//             activeOpacity={0.85}
+//           >
+//             <Text style={styles.btnText}>{busy ? 'Creating…' : 'Sign up'}</Text>
+//           </TouchableOpacity>
+
+//           <Text style={styles.terms}>
+//             By continuing, you agree to our <Text style={styles.termsLink}>Terms</Text> &{' '}
+//             <Text style={styles.termsLink}>Privacy Policy</Text>.
+//           </Text>
+//         </View>
+
+//         <TouchableOpacity onPress={() => navigation.replace('Login')}>
+//           <Text style={styles.link}>I already have an account</Text>
+//         </TouchableOpacity>
+//       </ScrollView>
+//     </KeyboardAvoidingView>
+//   );
+// }
+
+// const styles = StyleSheet.create({
+//   wrap: {
+//     flex: 1,
+//     backgroundColor: '#f4f7fb',
+//   },
+//   scroll: {
+//     padding: 20,
+//     paddingBottom: 32,
+//     justifyContent: 'center',
+//     flexGrow: 1,
+//   },
+//   header: {
+//     marginBottom: 12,
+//     alignItems: 'center',
+//   },
+//   h1: {
+//     fontSize: 24,
+//     fontWeight: '800',
+//     color: '#111827',
+//   },
+//   sub: {
+//     marginTop: 4,
+//     color: '#6b7280',
+//     fontSize: 14,
+//   },
+
+//   card: {
+//     backgroundColor: '#fff',
+//     borderRadius: 16,
+//     padding: 16,
+//     borderWidth: 1,
+//     borderColor: '#e5e7eb',
+//     // subtle shadow
+//     shadowColor: '#000',
+//     shadowOpacity: 0.06,
+//     shadowRadius: 8,
+//     shadowOffset: { width: 0, height: 4 },
+//     elevation: 3,
+//   },
+
+//   inputRow: {
+//     flexDirection: 'row',
+//     alignItems: 'center',
+//     backgroundColor: '#fff',
+//     borderRadius: 12,
+//     borderWidth: 1,
+//     borderColor: '#e5e7eb',
+//     marginVertical: 8,
+//     paddingHorizontal: 10,
+//   },
+//   leftIcon: { marginRight: 6 },
+//   inputField: {
+//     flex: 1,
+//     paddingVertical: 12,
+//     fontSize: 16,
+//     color: '#111827',
+//   },
+//   eyeButton: { paddingHorizontal: 8, paddingVertical: 10 },
+
+//   inputError: { borderColor: '#ef4444' },
+//   helper: { color: '#ef4444', fontSize: 12, marginTop: -2, marginBottom: 6 },
+
+//   errorBox: {
+//     flexDirection: 'row',
+//     alignItems: 'center',
+//     gap: 6,
+//     backgroundColor: '#fee2e2',
+//     borderColor: '#fecaca',
+//     borderWidth: 1,
+//     padding: 10,
+//     borderRadius: 10,
+//     marginTop: 6,
+//   },
+//   errorText: { color: '#b91c1c', flex: 1 },
+
+//   btn: {
+//     backgroundColor: THEME,
+//     paddingVertical: 14,
+//     borderRadius: 12,
+//     marginTop: 12,
+//     alignItems: 'center',
+//   },
+//   btnText: { color: '#fff', fontWeight: '700', fontSize: 16 },
+
+//   terms: {
+//     textAlign: 'center',
+//     color: '#6b7280',
+//     fontSize: 12,
+//     marginTop: 10,
+//   },
+//   termsLink: {
+//     color: THEME,
+//     fontWeight: '600',
+//   },
+
+//   link: {
+//     marginTop: 16,
+//     color: THEME,
+//     fontWeight: '600',
+//     textAlign: 'center',
+//   },
+// });
 // src/screens/SignupScreen.js
-import React, { useState, useMemo } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  KeyboardAvoidingView,
+  Platform,
+  StatusBar,
+  ScrollView,
+} from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { signUp } from '../services/authService';
 import { THEME } from '../utils/map';
 
 export default function SignupScreen({ navigation }) {
-  const [countryCode, setCountryCode] = useState('91'); // default India
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
 
-  // --- Inputs & validation ---
-  const onChangeCC = (v) => {
-    const digits = (v || '').replace(/\D/g, '').slice(0, 3); // allow up to 3 digits
-    setCountryCode(digits);
-    setErr('');
-  };
-
   const onChangePhone = (v) => {
-    const digits = (v || '').replace(/\D/g, '').slice(0, 10); // 10 digits local
+    const digits = (v || '').replace(/\D/g, '').slice(0, 10);
     setPhone(digits);
     setErr('');
   };
 
-  const isValidCC = useMemo(() => /^\d{1,3}$/.test(countryCode), [countryCode]);
   const isValidPhone = useMemo(() => /^\d{10}$/.test(phone), [phone]);
-  const canSubmit = isValidCC && isValidPhone && password && !busy;
+  const isValidPassword = useMemo(() => (password || '').length >= 6, [password]);
+  const canSubmit = isValidPhone && isValidPassword && !busy;
 
-  const e164 = useMemo(() => (isValidCC && isValidPhone ? `+${countryCode}${phone}` : ''), [countryCode, phone, isValidCC, isValidPhone]);
-
-  // --- Actions ---
   const onSignup = async () => {
     if (!canSubmit) {
-      if (!isValidCC) setErr('Enter a valid country code (1–3 digits).');
-      else if (!isValidPhone) setErr('Enter a 10-digit mobile number.');
+      if (!isValidPhone) setErr('Enter a valid 10-digit mobile number.');
+      else if (!isValidPassword) setErr('Password must be at least 6 characters.');
       return;
     }
     setBusy(true);
     setErr('');
     try {
-      // Ensure your authService accepts an E.164 phone (e.g., +919876543210)
-      await signUp(e164, password);
+      await signUp(phone, password); // expects (local10, password)
       navigation.replace('Home');
     } catch (e) {
-      // Show quiet inline message (no alerts)
-      setErr('Signup failed. Please check details and try again.');
+      const map = {
+        'invalid-10-digit': 'Enter a valid 10-digit mobile number.',
+        'auth/weak-password': 'Password must be at least 6 characters.',
+        'auth/email-already-in-use': 'This mobile is already registered. Try signing in.',
+        'auth/operation-not-allowed': 'Email/Password sign-up is disabled in Firebase.',
+        'auth/network-request-failed': 'Network error. Check your connection.',
+      };
+      setErr(map[e?.code] || 'Signup failed. Please try again.');
       console.warn('Signup error:', e);
     } finally {
       setBusy(false);
@@ -55,103 +325,187 @@ export default function SignupScreen({ navigation }) {
   };
 
   return (
-    <View style={s.wrap}>
-      <Text style={s.h1}>Create account</Text>
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      style={styles.wrap}
+    >
+      <StatusBar backgroundColor={THEME} barStyle="light-content" />
 
-      {/* Country code + phone row */}
-      <View style={[s.row, (!isValidCC || (!isValidPhone && phone.length > 0)) && s.rowError]}>
-        <View style={s.ccWrap}>
-          <Text style={s.plus}>+</Text>
-          <TextInput
-            placeholder="CC"
-            style={s.ccInput}
-            keyboardType="number-pad"
-            inputMode="numeric"
-            value={countryCode}
-            onChangeText={onChangeCC}
-            maxLength={3}
-          />
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        keyboardShouldPersistTaps="handled"
+      >
+        {/* Tabs toggle under the brand header */}
+        <View style={styles.tabsRow}>
+          <TouchableOpacity style={styles.tab} onPress={() => navigation.replace('Login')} activeOpacity={0.9}>
+            <Text style={styles.tabText}>Login</Text>
+          </TouchableOpacity>
+          <View style={[styles.tab, styles.tabActive]}>
+            <Text style={[styles.tabText, styles.tabTextActive]}>Sign up</Text>
+          </View>
         </View>
 
-        <TextInput
-          placeholder="Mobile Number"
-          style={s.phoneInput}
-          keyboardType="phone-pad"
-          inputMode="numeric"
-          value={phone}
-          onChangeText={onChangePhone}
-          maxLength={10}
-        />
-      </View>
+        <View style={styles.header}>
+          <Text style={styles.h1}>Create your account</Text>
+          <Text style={styles.sub}>Start learning faster with ABS</Text>
+        </View>
 
-      {!isValidCC ? <Text style={s.helper}>Enter a valid country code (e.g., 91).</Text> : null}
-      {!isValidPhone && phone.length > 0 ? (
-        <Text style={s.helper}>Enter a 10-digit mobile number.</Text>
-      ) : null}
+        <View style={styles.card}>
+          {/* Phone */}
+          <View
+            style={[
+              styles.inputRow,
+              !isValidPhone && phone.length > 0 && styles.inputError,
+            ]}
+          >
+            <Icon name="phone-outline" size={20} color="#6b7280" style={styles.leftIcon} />
+            <TextInput
+              placeholder="Mobile Number (10 digits)"
+              placeholderTextColor="#9ca3af"
+              style={styles.inputField}
+              keyboardType="phone-pad"
+              inputMode="numeric"
+              autoCapitalize="none"
+              autoCorrect={false}
+              value={phone}
+              onChangeText={onChangePhone}
+              maxLength={10}
+              returnKeyType="next"
+            />
+          </View>
+          {!isValidPhone && phone.length > 0 ? (
+            <Text style={styles.helper}>Enter a 10-digit mobile number.</Text>
+          ) : null}
 
-      {/* Password + show/hide */}
-      <View style={s.inputRow}>
-        <TextInput
-          placeholder="Password"
-          style={s.inputFlex}
-          secureTextEntry={!showPassword}
-          autoCapitalize="none"
-          autoCorrect={false}
-          value={password}
-          onChangeText={(v) => { setPassword(v); setErr(''); }}
-        />
-        <TouchableOpacity
-          onPress={() => setShowPassword(v => !v)}
-          style={s.eyeBtn}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <Icon name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={22} color="#6b7280" />
+          {/* Password */}
+          <View
+            style={[
+              styles.inputRow,
+              !isValidPassword && password.length > 0 && styles.inputError,
+            ]}
+          >
+            <Icon name="lock-outline" size={20} color="#6b7280" style={styles.leftIcon} />
+            <TextInput
+              placeholder="Password (min 6 characters)"
+              placeholderTextColor="#9ca3af"
+              style={styles.inputField}
+              secureTextEntry={!showPassword}
+              value={password}
+              onChangeText={(v) => { setPassword(v); setErr(''); }}
+              autoCapitalize="none"
+              autoCorrect={false}
+              returnKeyType="done"
+              onSubmitEditing={onSignup}
+            />
+            <TouchableOpacity onPress={() => setShowPassword(v => !v)} style={styles.eyeButton}>
+              <Icon
+                name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                size={20}
+                color="#6b7280"
+              />
+            </TouchableOpacity>
+          </View>
+          {!isValidPassword && password.length > 0 ? (
+            <Text style={styles.helper}>Password must be at least 6 characters.</Text>
+          ) : null}
+
+          {!!err && (
+            <View style={styles.errorBox}>
+              <Icon name="alert-circle-outline" size={18} color="#ef4444" />
+              <Text style={styles.errorText}>{err}</Text>
+            </View>
+          )}
+
+          <TouchableOpacity
+            style={[styles.btn, !canSubmit && { opacity: 0.6 }]}
+            onPress={onSignup}
+            disabled={!canSubmit}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.btnText}>{busy ? 'Creating…' : 'Sign up'}</Text>
+          </TouchableOpacity>
+
+          <Text style={styles.terms}>
+            By continuing, you agree to our <Text style={styles.termsLink}>Terms</Text> &{' '}
+            <Text style={styles.termsLink}>Privacy Policy</Text>.
+          </Text>
+        </View>
+
+        <TouchableOpacity onPress={() => navigation.replace('Login')}>
+          <Text style={styles.link}>I already have an account</Text>
         </TouchableOpacity>
-      </View>
-
-      {err ? <Text style={s.errorText}>{err}</Text> : null}
-
-      <TouchableOpacity style={[s.btn, !canSubmit && { opacity: 0.6 }]} onPress={onSignup} disabled={!canSubmit}>
-        <Text style={s.btnText}>{busy ? 'Creating…' : 'Sign up'}</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity onPress={() => navigation.replace('Login')}>
-        <Text style={s.link}>I have an account</Text>
-      </TouchableOpacity>
-    </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
-const s = StyleSheet.create({
-  wrap: { flex: 1, backgroundColor: '#f4f7fb', padding: 20, justifyContent: 'center' },
-  h1: { fontSize: 24, fontWeight: '800', marginBottom: 20, color: '#111827' },
+const styles = StyleSheet.create({
+  wrap: {
+    flex: 1,
+    backgroundColor: '#f4f7fb',
+  },
+  scroll: {
+    padding: 20,
+    paddingBottom: 32,
+    justifyContent: 'center',
+    flexGrow: 1,
+  },
 
-  // CC + phone row
-  row: {
+  // Tabs toggle (same look as Login)
+  tabsRow: {
     flexDirection: 'row',
+    alignSelf: 'center',
+    backgroundColor: '#eaf1fe',
+    borderRadius: 9999,
+    padding: 4,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#d7e4ff',
+  },
+  tab: {
+    paddingVertical: 6,
+    paddingHorizontal: 16,
+    borderRadius: 9999,
+  },
+  tabActive: {
+    backgroundColor: THEME,
+  },
+  tabText: {
+    color: '#1e293b',
+    fontWeight: '700',
+  },
+  tabTextActive: {
+    color: '#fff',
+  },
+
+  header: {
+    marginBottom: 12,
     alignItems: 'center',
+  },
+  h1: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#111827',
+  },
+  sub: {
+    marginTop: 4,
+    color: '#6b7280',
+    fontSize: 14,
+  },
+
+  card: {
     backgroundColor: '#fff',
-    borderRadius: 12,
+    borderRadius: 16,
+    padding: 16,
     borderWidth: 1,
     borderColor: '#e5e7eb',
-    marginVertical: 8,
+    // subtle shadow
+    shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
   },
-  rowError: { borderColor: '#ef4444' },
-
-  ccWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    borderRightWidth: 1,
-    borderRightColor: '#e5e7eb',
-    height: 48,
-  },
-  plus: { fontSize: 16, color: '#111827', marginRight: 4 },
-  ccInput: { width: 44, paddingVertical: 0, color: '#111827' },
-
-  phoneInput: { flex: 1, paddingHorizontal: 12, height: 48, color: '#111827' },
-
-  helper: { color: '#ef4444', fontSize: 12, marginTop: -4, marginBottom: 6 },
 
   inputRow: {
     flexDirection: 'row',
@@ -161,14 +515,57 @@ const s = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e5e7eb',
     marginVertical: 8,
-    paddingRight: 10,
+    paddingHorizontal: 10,
   },
-  inputFlex: { flex: 1, padding: 14 },
-  eyeBtn: { paddingLeft: 8, paddingVertical: 6 },
+  leftIcon: { marginRight: 6 },
+  inputField: {
+    flex: 1,
+    paddingVertical: 12,
+    fontSize: 16,
+    color: '#111827',
+  },
+  eyeButton: { paddingHorizontal: 8, paddingVertical: 10 },
 
-  errorText: { color: '#ef4444', marginTop: 6 },
+  inputError: { borderColor: '#ef4444' },
+  helper: { color: '#ef4444', fontSize: 12, marginTop: -2, marginBottom: 6 },
 
-  btn: { backgroundColor: THEME, padding: 14, borderRadius: 12, marginTop: 10, alignItems: 'center' },
-  btnText: { color: '#fff', fontWeight: '700' },
-  link: { marginTop: 16, color: THEME, fontWeight: '600', textAlign: 'center' },
+  errorBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#fee2e2',
+    borderColor: '#fecaca',
+    borderWidth: 1,
+    padding: 10,
+    borderRadius: 10,
+    marginTop: 6,
+  },
+  errorText: { color: '#b91c1c', flex: 1 },
+
+  btn: {
+    backgroundColor: THEME,
+    paddingVertical: 14,
+    borderRadius: 12,
+    marginTop: 12,
+    alignItems: 'center',
+  },
+  btnText: { color: '#fff', fontWeight: '700', fontSize: 16 },
+
+  terms: {
+    textAlign: 'center',
+    color: '#6b7280',
+    fontSize: 12,
+    marginTop: 10,
+  },
+  termsLink: {
+    color: THEME,
+    fontWeight: '600',
+  },
+
+  link: {
+    marginTop: 16,
+    color: THEME,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
 });

@@ -1,3 +1,5 @@
+
+//src/utils/fcmMinimal.js
 import messaging from '@react-native-firebase/messaging';
 import { Platform, PermissionsAndroid } from 'react-native';
 import { addNotification } from './notificationsStorage';

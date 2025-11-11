@@ -1,12 +1,7 @@
-// src/screens/ExplorerScreen.js
+// // src/screens/ExplorerScreen.js
 import React, { useEffect, useState, useCallback } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  TouchableOpacity,
-  ActivityIndicator,
+  View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator,
 } from 'react-native';
 import firestore from '@react-native-firebase/firestore';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -27,10 +22,7 @@ export default function ExplorerScreen({ route, navigation }) {
   // Subscribe to children of the current folder
   useEffect(() => {
     setLoading(true);
-
     const col = firestore().collection('nodes');
-
-    // If we're at root, match parentId == null OR parentRef == null
     const isRoot = currentId == null;
 
     // Q1: string parentId
@@ -69,48 +61,39 @@ export default function ExplorerScreen({ route, navigation }) {
     };
 
     const u1 = q1.onSnapshot(
-      (s) => {
-        a = mapSnap(s);
-        apply();
-      },
-      (e) => {
-        console.warn('Explorer q1 error:', e);
-        setLoading(false);
-      }
+      (s) => { a = mapSnap(s); apply(); },
+      (e) => { console.warn('Explorer q1 error:', e); setLoading(false); }
     );
 
     const u2 = q2.onSnapshot(
-      (s) => {
-        b = mapSnap(s);
-        apply();
-      },
-      (e) => {
-        console.warn('Explorer q2 error:', e);
-        setLoading(false);
-      }
+      (s) => { b = mapSnap(s); apply(); },
+      (e) => { console.warn('Explorer q2 error:', e); setLoading(false); }
     );
 
     unsubs.push(u1, u2);
     return () => unsubs.forEach((fn) => fn && fn());
   }, [currentId]);
 
-  // Open folder or file
+  // Open folder or file (NO embedUrl anywhere)
   const openItem = useCallback(
     (item) => {
       if (item.type === 'folder') {
-        // Drill-down: push another Explorer for the subfolder
         navigation.push('Explorer', {
           openFolderId: item.id,
           openFolderName: item.name,
         });
-      } else {
-        // Leaf: hand off to Viewer (it can fetch by nodeId and decide how to render)
-        navigation.push('Viewer', {
-          nodeId: item.id, title: item.name, type: item.type,
-          url: item.url,
-          embedUrl: item.embedUrl,
-        });
+        return;
       }
+
+      // Prefer raw url or meta urls only
+      const url = item?.url || item?.meta?.videoUrl || item?.meta?.pdfUrl || null;
+
+      navigation.push('Viewer', {
+        nodeId: item.id,
+        title: item.name,
+        type: item.type,
+        url,
+      });
     },
     [navigation]
   );

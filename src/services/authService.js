@@ -41,11 +41,13 @@
 //   return auth().signOut();
 // }
 // src/services/authService.js
+// src/services/authService.js
 import auth from '@react-native-firebase/auth';
 import firestore from '@react-native-firebase/firestore';
 
 const FAB_EMAIL_DOMAIN = 'phoneuser.nursinglecture.com';
 
+// Convert a 10-digit mobile to a fabricated email (for Firebase Email/Password)
 function phoneToEmail(local10) {
   const digits = (local10 || '').replace(/\D/g, '');
   if (!/^\d{10}$/.test(digits)) {
@@ -56,57 +58,27 @@ function phoneToEmail(local10) {
   return `${digits}@${FAB_EMAIL_DOMAIN}`;
 }
 
-function normalizeUsername(raw) {
-  const u = (raw || '').trim().toLowerCase();
-  if (!/^[a-z0-9._]{3,20}$/.test(u)) {
-    const err = new Error('invalid-username');
-    err.code = 'invalid-username';
-    throw err;
-  }
-  return u;
-}
-
-export async function signUp(local10, password, username) {
+export async function signUp(local10, password) {
   if (!password || password.length < 6) {
     const err = new Error('weak-password');
     err.code = 'auth/weak-password';
     throw err;
   }
-  const email = phoneToEmail(local10);
-  const usernameLower = normalizeUsername(username);
 
+  const email = phoneToEmail(local10);
   const cred = await auth().createUserWithEmailAndPassword(email, password);
   const uid = cred.user.uid;
 
-  const usernamesRef = firestore().collection('usernames').doc(usernameLower);
-  const userRef = firestore().collection('users').doc(uid);
+  // Create (or merge) a basic user profile document
+  const phoneDigits = String(local10).replace(/\D/g, '');
+  await firestore().collection('users').doc(uid).set({
+    uid,
+    phoneLocal10: phoneDigits,
+    createdAt: firestore.FieldValue.serverTimestamp(),
+    updatedAt: firestore.FieldValue.serverTimestamp(),
+  }, { merge: true });
 
-  try {
-    await firestore().runTransaction(async (txn) => {
-      const unameSnap = await txn.get(usernamesRef);
-      if (unameSnap.exists) {
-        const err = new Error('username-taken');
-        err.code = 'username-taken';
-        throw err;
-      }
-      txn.set(userRef, {
-        uid,
-        username: usernameLower,
-        phoneLocal10: local10.replace(/\D/g, ''),
-        createdAt: firestore.FieldValue.serverTimestamp(),
-        updatedAt: firestore.FieldValue.serverTimestamp(),
-      });
-      txn.set(usernamesRef, {
-        uid,
-        createdAt: firestore.FieldValue.serverTimestamp(),
-      });
-    });
-  } catch (e) {
-    try { await cred.user.delete(); } catch { }
-    throw e;
-  }
-
-  try { await cred.user.updateProfile({ displayName: usernameLower }); } catch { }
+  // (Optional) No displayName / username updates anymore
   return cred.user;
 }
 
