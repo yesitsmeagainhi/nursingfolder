@@ -1012,6 +1012,9 @@
 //     navTextActive: { color: '#166534', fontSize: 12, fontWeight: '600', marginTop: 4 },
 //     navTextSoon: { color: '#195ed2', fontSize: 12, marginTop: 4 },
 // });
+
+
+//src/screens/ContactScreen.js
 import React, { useState } from 'react';
 import {
     View, Text, StatusBar, TextInput, TouchableOpacity, StyleSheet,
@@ -1025,7 +1028,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 // --------- Admin contact shown in the UI ----------
 const PHONE = '+919833211999';
 const EMAIL = 'bwtnaresh@gmail.com';
-const ADDRESS_LINE = 'ABS Educational Solution, Bhayandar (W),\n Mumbai';
+const ADDRESS_LINE = 'ABS Educational Solution, MINI MARKET \nBUILDING, 104-106, BP Rd, beside BASSEIN CATHOLIC BANK, Bhayandar, Venkateshwar Nagar, Bhayandar East, Mumbai, Mira Bhayandar, Maharashtra 401105';
 const MAP_Q = encodeURIComponent(ADDRESS_LINE);
 
 const BOTTOM_BAR_BASE = 56;
@@ -1034,7 +1037,7 @@ export default function ContactUsScreen({ navigation }) {
     const insets = useSafeAreaInsets();
     const { width } = useWindowDimensions();
     const scale = Math.min(Math.max(width / 390, 0.9), 1.12);  // Scale factor for responsive design
-    const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyvtEHQR8kgihBf6d2ciMZ-R4J8UvvUUR3Ae1gcuplLrwupH9wRwXhtQsreQ9fAmUs/exec'
+    const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxjmAUJa3Rqr8B7EXKDtTw1YDh-NawyzFl3LS9fJ_8D1x3f-pK8lX3MkQ_YFp2LUXY/exec'
     const APPS_SCRIPT_TOKEN = 'jinja27901n'
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');

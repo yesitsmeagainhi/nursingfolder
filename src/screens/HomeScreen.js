@@ -1366,7 +1366,29 @@ export default function HomeScreen({ navigation }) {
               onChangeText={setSearchQuery}
               onSubmitEditing={() => runSearch(searchQuery)}
               returnKeyType="search"
+              autoCapitalize="none"
+              autoCorrect={false}
             />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity
+                onPress={() => {
+                  setSearchQuery('');
+                  setShowSearchResults(false);
+                  setSearchResults([]);
+                }}
+                style={{
+                  position: 'absolute',
+                  right: 10 * scale,
+                  height: '100%',
+                  justifyContent: 'center',
+                }}
+                hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+                accessibilityRole="button"
+                accessibilityLabel="Clear search"
+              >
+                <Icon name="close-circle" size={20 * scale} color="#e0e7ff" />
+              </TouchableOpacity>
+            )}
           </View>
         </SafeHeader>
 

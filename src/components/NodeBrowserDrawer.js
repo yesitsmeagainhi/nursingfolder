@@ -447,6 +447,12 @@ export function NodeBrowserDrawer({ visible, onClose, onOpenFile, onOpenFolder, 
         onClose?.();                     // close immediately
     };
 
+    const greeting = (() => {
+        const h = new Date().getHours();
+        if (h < 12) return 'Good morning';
+        if (h < 18) return 'Good afternoon';
+        return 'Good evening';
+    })();
 
     return (
         <Modal
@@ -464,8 +470,8 @@ export function NodeBrowserDrawer({ visible, onClose, onOpenFile, onOpenFolder, 
                 {/* Header (keep yours) */}
                 <View style={styles.drawerHeader}>
                     <View>
-                        <Text style={styles.hello}>Hello, {userName || 'User'}</Text>
-                        <Text style={styles.drawerTitle}>Main Menu</Text>
+                        <Text style={styles.hello}>{greeting} 👋</Text>
+                        <Text style={styles.drawerTitle}>Quick Access</Text>
                     </View>
                     <TouchableOpacity onPress={onClose}>
                         <Icon name="close" size={22} color="#111" />

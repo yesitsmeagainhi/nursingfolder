@@ -34,7 +34,21 @@ import { addNotification } from './src/utils/notificationsStorage';
 
 const Stack = createNativeStackNavigator();
 
-// ────────────────────────────────────────────────────────────────────────────────
+/** ---------- helpers to keep types safe ---------- **/
+const asStr = (v: any): string | undefined =>
+  typeof v === 'string'
+    ? v
+    : v == null
+      ? undefined
+      : (typeof v === 'object' ? JSON.stringify(v) : String(v));
+
+const asStringRecord = (obj: any): Record<string, string> =>
+  Object.fromEntries(
+    Object.entries(obj || {}).map(([k, v]) => [k, asStr(v) ?? ''])
+  );
+
+/** ------------------------------------------------- **/
+
 // Call this ONLY AFTER LOGIN (or when auth state becomes non-null)
 export async function initNotifications(selectedCourseId?: string) {
   try {
@@ -43,15 +57,20 @@ export async function initNotifications(selectedCourseId?: string) {
         PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS
       );
     }
+
+    // ⬇️ Add these two lines near the top
+    await messaging().registerDeviceForRemoteMessages().catch(() => { });
     await messaging().requestPermission().catch(() => { });
+
     await ensureDefaultChannel();
 
-    // Topic subscriptions after sign-in
-    await messaging().subscribeToTopic('all');
-    if (selectedCourseId) {
-      const topic = `course_${String(selectedCourseId).toLowerCase()}`;
-      await messaging().subscribeToTopic(topic);
-    }
+    // ⬇️ Keep/ensure the topic subscription here (this runs after login)
+    await messaging().subscribeToTopic('all')
+      .then(() => console.log('[FCM] subscribed: all'))
+      .catch((e) => console.log('[FCM] subscribe err', e)); if (selectedCourseId) {
+        const topic = `course_${String(selectedCourseId).toLowerCase()}`;
+        await messaging().subscribeToTopic(topic).catch(() => { });
+      }
 
     const token = await messaging().getToken();
     console.log('FCM token:', token);
@@ -59,7 +78,8 @@ export async function initNotifications(selectedCourseId?: string) {
     console.log('initNotifications error', e);
   }
 }
-// ────────────────────────────────────────────────────────────────────────────────
+
+
 
 function toItem(remoteMessage: any) {
   const id =
@@ -68,19 +88,19 @@ function toItem(remoteMessage: any) {
     `${Date.now()}_${Math.random()}`;
   const n = remoteMessage?.notification || {};
   const d = remoteMessage?.data || {};
-  const title = n.title || d.title || 'Update';
-  const body = n.body || d.body || '';
+  const title = asStr(n.title) || asStr(d.title) || 'Update';
+  const body = asStr(n.body) || asStr(d.body) || '';
   const receivedAt = Date.now();
-  return { id, title, body, data: d, receivedAt, __origin: 'push' };
+  return { id, title, body, data: d, receivedAt, __origin: 'push' as const };
 }
 
-function handleNavigationFromMessage(data?: Record<string, string>) {
+function handleNavigationFromMessage(data?: Record<string, any>) {
   if (!data) return;
 
-  // Accept any of these flags from the payload
-  const nav = (data.nav || '').toLowerCase();
-  const screen = (data.screen || data.type || nav).toLowerCase();
-  const bestUrl = data.url || data.embedUrl || data.videoUrl;
+  const nav = (asStr(data.nav) || '').toLowerCase();
+  const screen = (asStr(data.screen) || asStr(data.type) || nav).toLowerCase();
+  const bestUrl =
+    asStr(data.url) || asStr(data.embedUrl) || asStr(data.videoUrl) || undefined;
 
   // Short-circuit for Notifications
   if (nav === 'notifications' || screen === 'notifications' || screen === 'notificationsscreen') {
@@ -93,16 +113,16 @@ function handleNavigationFromMessage(data?: Record<string, string>) {
     case 'videoplayer':
     case 'viewer':
       go('Viewer', {
-        title: data.title || 'Video',
+        title: asStr(data.title) || 'Video',
         type: 'video',
         url: bestUrl,
-        embedUrl: data.embedUrl,
-        nodeId: data.nodeId,
+        embedUrl: asStr(data.embedUrl),
+        nodeId: asStr(data.nodeId),
       });
       return;
 
     case 'explorer':
-      go('Explorer', { title: data.title || 'Explorer', path: data.path });
+      go('Explorer', { title: asStr(data.title) || 'Explorer', path: asStr(data.path) });
       return;
 
     case 'contact':
@@ -111,14 +131,13 @@ function handleNavigationFromMessage(data?: Record<string, string>) {
 
     case 'course':
     case 'coursedetails':
-      go('CourseDetails', { courseId: data.courseId, title: data.title || 'Course' });
+      go('CourseDetails', { courseId: asStr(data.courseId), title: asStr(data.title) || 'Course' });
       return;
 
     default:
       go('Home');
   }
 }
-
 
 function useNotificationHandlers(enabled: boolean) {
   useEffect(() => {
@@ -134,57 +153,68 @@ function useNotificationHandlers(enabled: boolean) {
       // 1) Foreground FCM → local notif + save to inbox
       unsubOnMessage = messaging().onMessage(async (rm) => {
         await ensureDefaultChannel();
-        const item = toItem(rm);
-        await addNotification(item);
+
+        const n = rm?.notification || {};
+        const d = rm?.data || {};
+
+        const title = asStr(n.title) || asStr(d.title) || 'Update';
+        const body = asStr(n.body) || asStr(d.body) || '';
+
+        await addNotification({
+          id: rm?.messageId || String(Date.now()),
+          title,
+          body,
+          receivedAt: Date.now(),
+          data: d,
+          __origin: 'push',
+        });
 
         await notifee.displayNotification({
-          id: item.id,
-          title: item.title,
-          body: item.body,
+          id: rm?.messageId || undefined,
+          title,
+          body,
           android: {
             channelId: 'default',
             smallIcon: 'ic_launcher',
             pressAction: { id: 'open-notifications' },
           },
-          "data": {
-            "nav": "Notifications",
-            "screen": "notifications",
-            "type": "notifications",
-            "title": "New video uploaded"
-          }
+          // Notifee expects Record<string, string>
+          data: asStringRecord({ nav: 'Notifications', ...d }),
         });
       });
 
-      // 2) App in background → user taps notification
-      // Background → user taps a push
+      // 2) App in background → user taps push
       unsubOpened = messaging().onNotificationOpenedApp((rm) => {
-        const d = rm?.data;
+        const d: any = rm?.data;
         if (!d) return;
 
-        if ((d.nav || '').toLowerCase() === 'notifications') {
+        if ((asStr(d.nav) || '').toLowerCase() === 'notifications') {
           go('Notifications');
         } else {
           handleNavigationFromMessage(d);
         }
       });
 
-
       // 3) Cold start via notification
       const initialFCM = await messaging().getInitialNotification();
-      if (initialFCM?.data) handleNavigationFromMessage(initialFCM.data);
+      console.log('[getInitialNotification]', initialFCM?.data);
+
+      if (initialFCM?.data) handleNavigationFromMessage(initialFCM.data as any);
 
       const initialLocal = await notifee.getInitialNotification();
-      const localData = initialLocal?.notification?.data as any;
+      const localData = (initialLocal?.notification?.data ?? null) as any;
       if (localData) {
-        if (localData.nav === 'Notifications') go('Notifications');
+        if ((asStr(localData.nav) || '').toLowerCase() === 'notifications') go('Notifications');
         else handleNavigationFromMessage(localData);
       }
 
       // 4) Foreground Notifee taps
       unsubNotifeeFg = notifee.onForegroundEvent(({ type, detail }) => {
+        console.log('[notifee.onForegroundEvent]', type, detail?.notification?.data);
+
         if (type === EventType.PRESS) {
           const data = detail.notification?.data as any;
-          if (data?.nav === 'Notifications') go('Notifications');
+          if ((asStr(data?.nav) || '').toLowerCase() === 'notifications') go('Notifications');
           else handleNavigationFromMessage(data);
         }
       });
@@ -210,7 +240,7 @@ function AppNavigator() {
         headerTitleStyle: { fontWeight: '700', fontSize: Math.round(18 * scale) },
         headerTitleAlign: 'left',
         headerShadowVisible: false,
-        headerTopInsetEnabled: true,
+        // removed headerTopInsetEnabled (invalid)
         statusBarColor: '#195ed2',
         statusBarStyle: 'light',
         statusBarTranslucent: false,
@@ -274,7 +304,7 @@ export default function App() {
 
       if (u) {
         try {
-          await initNotifications(); // optional: subscribe topics, get token
+          await initNotifications();
         } catch { }
       }
     });
