@@ -1,5 +1,5 @@
-package com.nursing
-
+package com.nursinglecture
+import com.nursinglecture.BuildConfig
 import android.app.Application
 import com.facebook.react.PackageList
 import com.facebook.react.ReactApplication
